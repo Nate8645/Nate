@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UltraLaunch AI Reel Tutorial</title>
+  <meta name="description" content="Vertikales deutsches Reel-Tutorial für UltraLaunch AI im Game-Level-Stil.">
+  <link rel="stylesheet" href="/app.css">
+  <style>
+    body { min-height: 100vh; display: grid; place-items: center; padding: 28px 14px; }
+    .reel-shell { width: min(520px, 100%); }
+    .reel-copy { margin-bottom: 16px; text-align: center; }
+    .reel-copy h1 { margin: 8px 0; font-size: clamp(2rem, 9vw, 3.4rem); letter-spacing: -.07em; }
+    .reel-copy p { color: var(--muted); }
+    .reel-card { border: 1px solid rgba(255,255,255,.18); border-radius: 34px; overflow: hidden; background: rgba(255,255,255,.07); box-shadow: 0 30px 100px rgba(0,0,0,.42); }
+    video { width: 100%; display: block; aspect-ratio: 9 / 16; background: #070914; }
+    .video-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 18px 0 0; }
+  </style>
+</head>
+<body>
+  <main class="reel-shell">
+    <div class="reel-copy">
+      <p class="eyebrow">Reel Tutorial</p>
+      <h1>UltraLaunch AI als Game-Level-Story.</h1>
+      <p>Vertikales Tutorial im Level-/Progress-Stil: Dashboard, Launch Kit, Agents, Automation, Trust und Launch Readiness.</p>
+      <div class="video-actions">
+        <a class="btn" href="/videos/ultralaunch-ai-reel-tutorial-deutsch.mp4" download>MP4 herunterladen</a>
+        <a class="btn btn-secondary" href="/watch-tutorial.html">Langes Tutorial</a>
+      </div>
+    </div>
+    <section class="reel-card" aria-label="UltraLaunch AI Reel Tutorial Video">
+      <video controls playsinline preload="metadata">
+        <source src="/videos/ultralaunch-ai-reel-tutorial-deutsch.mp4" type="video/mp4">
+        Dein Browser kann dieses Video nicht abspielen. Lade die MP4-Datei direkt herunter.
+      </video>
+    </section>
+  </main>
+</body>
+</html>

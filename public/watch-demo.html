@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UltraLaunch AI Klick-Demo Video</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#070914;color:#f7f8ff}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 0%,rgba(124,92,255,.32),transparent 36%),radial-gradient(circle at 90% 0%,rgba(24,225,193,.18),transparent 38%),#070914;display:grid;place-items:center;padding:18px}
+    .wrap{width:min(100%,980px)}
+    .card{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.075);border-radius:28px;padding:18px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+    h1{font-size:clamp(1.7rem,6vw,3.5rem);line-height:1;margin:0 0 10px;letter-spacing:-.05em}p{color:#aab3d3;margin:0 0 18px;font-size:1rem;line-height:1.5}.eyebrow{color:#91fff0;text-transform:uppercase;font-weight:900;letter-spacing:.12em;font-size:.78rem;margin-bottom:10px}
+    video{width:100%;border-radius:20px;background:#000;display:block;border:1px solid rgba(255,255,255,.12)}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:999px;background:linear-gradient(135deg,#7c5cff,#18e1c1);color:white;text-decoration:none;font-weight:900}.btn.secondary{background:rgba(255,255,255,.09)}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="card">
+      <p class="eyebrow">Tutorial Video</p>
+      <h1>UltraLaunch AI Klick-Demo</h1>
+      <p>Hier siehst du, wie ein Kunde durch deine Website klickt: Homepage, Registrierung, Dashboard, Launch-Kit, Abo, Billing, Pilot-Sprint und Admin.</p>
+      <video controls playsinline preload="metadata" poster="">
+        <source src="/videos/ultralaunch-ai-clickthrough-deutsch.mp4" type="video/mp4">
+        Dein Browser kann dieses Video nicht abspielen. Nutze den Download-Button unten.
+      </video>
+      <div class="actions">
+        <a class="btn" href="/videos/ultralaunch-ai-clickthrough-deutsch.mp4" download>Video herunterladen</a>
+        <a class="btn secondary" href="/">Zur Website</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

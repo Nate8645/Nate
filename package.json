@@ -1,0 +1,26 @@
+{
+  "name": "ultralaunch-ai-saas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UltraLaunch AI - launch-ready AI SaaS for founders, agencies, and ecommerce operators.",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "NODE_OPTIONS=--no-warnings node src/server.js",
+    "start": "NODE_ENV=production NODE_OPTIONS=--no-warnings node src/server.js",
+    "test": "NODE_OPTIONS=--no-warnings node --test",
+    "lint": "node scripts/lint-basic.js",
+    "stripe:setup": "NODE_OPTIONS=--no-warnings node scripts/setup-stripe.js",
+    "launch:check": "NODE_OPTIONS=--no-warnings node scripts/launch-check.js",
+    "env:prepare": "NODE_OPTIONS=--no-warnings node scripts/prepare-local-env.js",
+    "seed": "NODE_OPTIONS=--no-warnings node scripts/seed.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.19.2",
+    "stripe": "^17.5.0"
+  },
+  "devDependencies": {}
+}

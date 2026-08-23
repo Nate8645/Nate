@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs><linearGradient id="b" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#070914"/><stop offset=".55" stop-color="#111a36"/><stop offset="1" stop-color="#050711"/></linearGradient><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7c5cff"/><stop offset="1" stop-color="#18e1c1"/></linearGradient><radialGradient id="r" cx="75%" cy="18%" r="60%"><stop stop-color="#18e1c1" stop-opacity=".32"/><stop offset="1" stop-color="#18e1c1" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1200" height="630" fill="url(#b)"/><rect width="1200" height="630" fill="url(#r)"/>
+  <rect x="70" y="70" width="1060" height="490" rx="48" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.18)"/>
+  <text x="105" y="145" fill="#91fff0" font-family="Arial" font-size="28" font-weight="700" letter-spacing="4">ULTRALAUNCH AI</text>
+  <text x="105" y="275" fill="#fff" font-family="Arial" font-size="82" font-weight="900">From offer idea</text>
+  <text x="105" y="365" fill="#fff" font-family="Arial" font-size="82" font-weight="900">to launch motion.</text>
+  <text x="105" y="445" fill="#aab3d3" font-family="Arial" font-size="30">AI launch kits, pricing, outreach, billing, analytics.</text>
+  <rect x="105" y="485" width="310" height="58" rx="29" fill="url(#g)"/><text x="143" y="523" fill="#fff" font-family="Arial" font-size="24" font-weight="800">Generate free kit</text>
+</svg>

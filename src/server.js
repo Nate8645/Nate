@@ -10,6 +10,7 @@ const { getPlan, plans } = require('./plans');
 const { activeAiProvider, buildFallbackKit, generateLaunchKit } = require('./ai');
 const { stripeClient, createCheckoutSession, createPilotCheckoutSession, createPortalSession, stripeWebhookHandler, syncCheckoutSession } = require('./stripe');
 const { launchReadiness } = require('./launch-readiness');
+const { ensureTrustDefaults, logAction, upsertMemory, userTrustSnapshot, agentWorkspace, createAgentTask, exportUserData, permissionCatalog } = require('./intelligence');
 const views = require('./views');
 
 function createApp(options = {}) {
@@ -71,6 +72,10 @@ function createApp(options = {}) {
         updatedAt: nowIso(),
       });
       insertAnalytics(db, eventContext(req, 'pilot_request_submitted', { budget, urgency }));
+      if (req.user?.id) {
+        upsertMemory(db, { userId: req.user.id, key: 'pilot_offer_context', value: offer, source: 'pilot_request', confidence: 0.9 });
+        logAction(db, { userId: req.user.id, agentKey: 'growth-agent', actionType: 'pilot_request_submitted', status: 'queued', riskLevel: 'medium', permissionKey: 'workflow_automation', summary: `Pilot request submitted: ${urgency}`, metadata: { budget } });
+      }
       res.redirect('/pilot?message=Pilot%20request%20received.%20We%20will%20follow%20up%20with%20next%20steps.');
     } catch (error) {
       res.status(400).send(views.pilotPage(req, { error: error.message }));
@@ -113,6 +118,8 @@ function createApp(options = {}) {
       createSession(db, user, req, res);
       insertUsage(db, { userId: user.id, eventType: 'signup', units: 1 });
       insertAnalytics(db, eventContext(req, 'signup_completed', { userId: user.id }));
+      ensureTrustDefaults(db, user.id);
+      logAction(db, { userId: user.id, agentKey: 'trust-guardian', actionType: 'account_created', status: 'completed', riskLevel: 'low', summary: 'Account created and default permissions initialized' });
       res.redirect('/dashboard?message=Account%20created');
     } catch (error) {
       res.status(400).send(views.authPage(req, { mode: 'register', error: error.message }));
@@ -132,6 +139,7 @@ function createApp(options = {}) {
       }
       createSession(db, user, req, res);
       insertAnalytics(db, eventContext(req, 'login_completed', { userId: user.id }));
+      logAction(db, { userId: user.id, agentKey: 'trust-guardian', actionType: 'login_completed', status: 'completed', riskLevel: 'low', summary: 'User logged in' });
       res.redirect(returnTo);
     } catch (error) {
       res.status(400).send(views.authPage(req, { mode: 'login', error: error.message, returnTo }));
@@ -144,7 +152,118 @@ function createApp(options = {}) {
   });
 
   app.get('/dashboard', requireAuth, (req, res) => {
+    ensureTrustDefaults(db, req.user.id);
     res.send(renderDashboard(req, db, { message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.get('/agents', requireAuth, (req, res) => {
+    res.send(views.agentsPage(req, { workspace: agentWorkspace(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/agents/tasks', requireAuth, rateLimit({ windowMs: 15 * 60 * 1000, max: 12, prefix: 'agent-task' }), (req, res) => {
+    try {
+      const agentKey = safeText(req.body.agentKey, 80);
+      const title = safeText(req.body.title, 180);
+      const priority = safeChoice(req.body.priority, ['low', 'normal', 'high', 'urgent'], 'normal');
+      const requiresApproval = req.body.requiresApproval === 'no' ? 0 : 1;
+      createAgentTask(db, { userId: req.user.id, agentKey, title, priority, requiresApproval });
+      res.redirect('/agents?message=Agent%20task%20queued');
+    } catch (error) {
+      res.redirect(`/agents?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.post('/agents/tasks/:id/status', requireAuth, (req, res) => {
+    const status = safeChoice(req.body.status, ['approved', 'rejected', 'completed'], 'approved');
+    const taskId = Number(req.params.id);
+    const task = one(db, 'SELECT * FROM agent_tasks WHERE id = :id AND user_id = :userId', { id: taskId, userId: req.user.id });
+    if (task) {
+      run(db, 'UPDATE agent_tasks SET status = :status, updated_at = :updatedAt WHERE id = :id AND user_id = :userId', {
+        status,
+        updatedAt: nowIso(),
+        id: taskId,
+        userId: req.user.id,
+      });
+      logAction(db, { userId: req.user.id, agentKey: task.agent_key, actionType: 'agent_task_status_changed', status, riskLevel: status === 'approved' ? 'medium' : 'low', summary: `Task ${task.title} marked ${status}` });
+    }
+    res.redirect('/agents?message=Task%20updated');
+  });
+
+  app.get('/automations', requireAuth, (req, res) => {
+    ensureTrustDefaults(db, req.user.id);
+    const rules = all(db, 'SELECT * FROM automation_rules WHERE user_id = :userId ORDER BY created_at DESC', { userId: req.user.id });
+    res.send(views.automationsPage(req, { rules, message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/automations', requireAuth, rateLimit({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'automation' }), (req, res) => {
+    try {
+      const name = safeText(req.body.name, 120);
+      const triggerType = safeChoice(req.body.triggerType, ['launch_kit_generated', 'pilot_request_submitted', 'weekly_schedule', 'support_ticket_created', 'manual'], 'manual');
+      const conditionText = safeText(req.body.conditionText, 500);
+      const actionText = safeText(req.body.actionText, 700);
+      const requiresApproval = req.body.requiresApproval === 'no' ? 0 : 1;
+      run(db, `INSERT INTO automation_rules (user_id, name, trigger_type, condition_text, action_text, requires_approval, is_enabled, created_at, updated_at)
+               VALUES (:userId, :name, :triggerType, :conditionText, :actionText, :requiresApproval, 1, :createdAt, :updatedAt)`, {
+        userId: req.user.id,
+        name,
+        triggerType,
+        conditionText,
+        actionText,
+        requiresApproval,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+      logAction(db, { userId: req.user.id, agentKey: 'ops-automation', actionType: 'automation_rule_created', status: 'created', riskLevel: requiresApproval ? 'medium' : 'low', permissionKey: 'workflow_automation', summary: `Automation rule created: ${name}` });
+      res.redirect('/automations?message=Automation%20created');
+    } catch (error) {
+      res.redirect(`/automations?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.post('/automations/:id/toggle', requireAuth, (req, res) => {
+    const ruleId = Number(req.params.id);
+    const rule = one(db, 'SELECT * FROM automation_rules WHERE id = :id AND user_id = :userId', { id: ruleId, userId: req.user.id });
+    if (rule) {
+      const next = rule.is_enabled ? 0 : 1;
+      run(db, 'UPDATE automation_rules SET is_enabled = :next, updated_at = :updatedAt WHERE id = :id AND user_id = :userId', { next, updatedAt: nowIso(), id: ruleId, userId: req.user.id });
+      logAction(db, { userId: req.user.id, agentKey: 'ops-automation', actionType: 'automation_rule_toggled', status: next ? 'enabled' : 'disabled', riskLevel: 'low', summary: `Automation ${rule.name} ${next ? 'enabled' : 'disabled'}` });
+    }
+    res.redirect('/automations?message=Automation%20updated');
+  });
+
+  app.get('/trust', requireAuth, (req, res) => {
+    res.send(views.trustCenterPage(req, { snapshot: userTrustSnapshot(db, req.user.id), permissions: permissionCatalog, message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/trust/permissions/:key', requireAuth, (req, res) => {
+    const permission = permissionCatalog.find((item) => item.key === req.params.key);
+    if (!permission) return res.redirect('/trust?error=Unknown%20permission');
+    const status = safeChoice(req.body.status, ['granted', 'limited', 'approval_required', 'revoked'], permission.defaultStatus);
+    run(db, `INSERT INTO permission_grants (user_id, permission_key, status, scope, created_at, updated_at)
+             VALUES (:userId, :permissionKey, :status, :scope, :createdAt, :updatedAt)
+             ON CONFLICT(user_id, permission_key) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`, {
+      userId: req.user.id,
+      permissionKey: permission.key,
+      status,
+      scope: JSON.stringify({ risk: permission.risk }),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'permission_changed', status, riskLevel: permission.risk, permissionKey: permission.key, summary: `${permission.name} permission set to ${status}` });
+    res.redirect('/trust?message=Permission%20updated');
+  });
+
+  app.post('/trust/memories/:id/delete', requireAuth, (req, res) => {
+    run(db, 'DELETE FROM user_memories WHERE id = :id AND user_id = :userId', { id: Number(req.params.id), userId: req.user.id });
+    logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'memory_deleted', status: 'completed', riskLevel: 'low', permissionKey: 'ai_memory', summary: 'User deleted one AI memory' });
+    res.redirect('/trust?message=Memory%20deleted');
+  });
+
+  app.get('/trust/export.json', requireAuth, (req, res) => {
+    logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'data_export_created', status: 'completed', riskLevel: 'medium', permissionKey: 'file_management', summary: 'User exported account data' });
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="ultralaunch-data-export.json"');
+    res.send(JSON.stringify(exportUserData(db, req.user), null, 2));
   });
 
   app.post('/dashboard/launch-kits', requireAuth, rateLimit({ windowMs: 60 * 60 * 1000, max: 20, prefix: 'kit' }), async (req, res, next) => {
@@ -184,6 +303,10 @@ function createApp(options = {}) {
       });
       insertUsage(db, { userId: req.user.id, eventType: 'launch_kit_generated', units: 1, metadata: { kitId: Number(insert.lastInsertRowid), provider } });
       insertAnalytics(db, eventContext(req, 'launch_kit_generated', { kitId: Number(insert.lastInsertRowid), provider }));
+      upsertMemory(db, { userId: req.user.id, key: 'last_industry', value: input.industry, source: 'launch_kit' });
+      upsertMemory(db, { userId: req.user.id, key: 'last_audience', value: input.audience, source: 'launch_kit' });
+      upsertMemory(db, { userId: req.user.id, key: 'preferred_tone', value: input.tone, source: 'launch_kit' });
+      logAction(db, { userId: req.user.id, agentKey: 'launch-orchestrator', actionType: 'launch_kit_generated', status: 'completed', riskLevel: 'low', permissionKey: 'ai_memory', summary: `Generated launch kit for ${input.businessName}`, metadata: { kitId: Number(insert.lastInsertRowid), provider } });
       res.redirect(`/dashboard/kits/${Number(insert.lastInsertRowid)}`);
     } catch (error) {
       if (error.message.includes('fetch') || error.message.includes('AI')) console.error(error);
@@ -226,6 +349,7 @@ function createApp(options = {}) {
         updatedAt: nowIso(),
       });
       insertAnalytics(db, eventContext(req, 'support_ticket_created', { subject }));
+      logAction(db, { userId: req.user.id, agentKey: 'ops-automation', actionType: 'support_ticket_created', status: 'open', riskLevel: 'low', summary: `Support ticket opened: ${subject}` });
       res.redirect('/support?message=Ticket%20opened');
     } catch (error) {
       res.redirect(`/support?error=${encodeURIComponent(error.message)}`);
@@ -241,6 +365,7 @@ function createApp(options = {}) {
       const session = await createCheckoutSession(db, req, planKey);
       if (!session.configured) return res.status(412).send(views.stripeConfigPage(req, { planKey }));
       insertAnalytics(db, eventContext(req, 'stripe_checkout_started', { plan: planKey, sessionId: session.id }));
+      logAction(db, { userId: req.user.id, agentKey: 'growth-agent', actionType: 'stripe_checkout_started', status: 'redirected', riskLevel: 'medium', permissionKey: 'connected_accounts', summary: `Started subscription checkout for ${planKey}`, metadata: { sessionId: session.id } });
       res.redirect(303, session.url);
     } catch (error) {
       next(error);
@@ -252,6 +377,7 @@ function createApp(options = {}) {
       const session = await createPilotCheckoutSession(db, req);
       if (!session.configured) return res.status(412).send(views.stripeConfigPage(req, { planKey: 'pilot' }));
       insertAnalytics(db, eventContext(req, 'stripe_pilot_checkout_started', { sessionId: session.id }));
+      logAction(db, { userId: req.user.id, agentKey: 'growth-agent', actionType: 'stripe_pilot_checkout_started', status: 'redirected', riskLevel: 'medium', permissionKey: 'connected_accounts', summary: 'Started concierge sprint checkout', metadata: { sessionId: session.id } });
       res.redirect(303, session.url);
     } catch (error) {
       next(error);

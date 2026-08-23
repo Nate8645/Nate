@@ -87,6 +87,39 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.equal(res.status, 200);
     assert.match(adminHtml, /Operating cockpit/);
     assert.match(adminHtml, /Launch kits/);
+    assert.match(adminHtml, /AI actions/);
+
+    res = await request('/agents');
+    const agentsHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(agentsHtml, /AI Workforce/);
+    assert.match(agentsHtml, /Computer Control Agent/);
+    const agentsCsrf = extractCsrf(agentsHtml);
+
+    res = await request('/agents/tasks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: agentsCsrf,
+        agentKey: 'computer-control',
+        title: 'Prepare browser research plan for 20 Shopify leads',
+        priority: 'high',
+        requiresApproval: 'yes',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/agents?message=Agent%20task%20queued');
+
+    res = await request('/trust');
+    const trustHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(trustHtml, /Trust center/);
+    assert.match(trustHtml, /Terminal \/ Computer Actions/);
+
+    res = await request('/automations');
+    const automationsHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(automationsHtml, /Automation engine/);
 
     res = await request('/product');
     const productHtml = await res.text();

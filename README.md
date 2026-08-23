@@ -14,7 +14,10 @@ It includes:
 - SQLite database persistence
 - Usage tracking and plan limits
 - Stripe Checkout, subscriptions, webhooks, customer portal, upgrade, downgrade, and cancellation flow
-- Admin area with analytics, users, tickets, and product events
+- Admin area with analytics, users, tickets, product events, AI actions, approvals, and automation metrics
+- AI Workforce with role-based agents, task queue, permissions, logs, KPIs, and memory
+- Trust Center with permission controls, AI action history, memory deletion, connected-account readiness, and JSON data export
+- Automation Engine with triggers, conditions, actions, and human-approval gates
 - Customer support contact and ticket flow
 - SEO assets: sitemap, robots, metadata
 - Security baseline: password hashing, CSRF, rate limits, verified webhooks, env-based secrets

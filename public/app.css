@@ -465,6 +465,7 @@ td { color: var(--muted); }
 .flash.info { color: var(--muted); }
 .status-card.ok { border-color: rgba(64,223,143,0.32); }
 .status-card.missing { border-color: rgba(255,84,112,0.42); }
+.status-card.recommended { border-color: rgba(255,209,102,0.36); }
 .status-pill {
   display: inline-flex;
   border-radius: 999px;
@@ -478,6 +479,7 @@ td { color: var(--muted); }
   letter-spacing: 0.08em;
 }
 .status-card.missing .status-pill { color: #ffd0d8; }
+.status-card.recommended .status-pill { color: #ffe5a3; }
 
 .cta-band { padding-top: 32px; }
 .cta-card {

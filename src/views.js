@@ -536,7 +536,7 @@ function launchStatusPage(req, { status }) {
     content: `<section class="dashboard-hero"><div class="container dashboard-head"><div><p class="eyebrow">Launch control</p><h1>${status.ready ? 'Ready for paid launch' : 'Manual setup still required'}</h1><p>${status.requiredPassed}/${status.requiredTotal} required launch checks passed. Secrets are masked and never displayed.</p></div><a class="btn btn-secondary" href="/admin">Back to admin</a></div></section>
     <section class="section"><div class="container stack">
       <div class="card"><h2>Next manual actions</h2>${status.nextManualActions.length ? `<ol>${status.nextManualActions.map((item) => `<li>${e(item)}</li>`).join('')}</ol>` : '<p>All required environment checks passed. Run Stripe test checkout, publish the URL, and start outreach.</p>'}</div>
-      <div class="card-grid two-col">${status.checks.map((item) => `<article class="card status-card ${item.ok ? 'ok' : 'missing'}"><span class="status-pill">${item.ok ? 'Ready' : 'Missing'}</span><h3>${e(item.name)}</h3><p>${e(item.detail)}</p>${!item.ok && item.action ? `<p><strong>Action:</strong> ${e(item.action)}</p>` : ''}</article>`).join('')}</div>
+      <div class="card-grid two-col">${status.checks.map((item) => `<article class="card status-card ${item.ok ? 'ok' : item.severity === 'required' ? 'missing' : 'recommended'}"><span class="status-pill">${item.ok ? 'Ready' : item.severity === 'required' ? 'Missing' : item.severity}</span><h3>${e(item.name)}</h3><p>${e(item.detail)}</p>${!item.ok && item.action ? `<p><strong>Action:</strong> ${e(item.action)}</p>` : ''}</article>`).join('')}</div>
     </div></section>`,
   });
 }

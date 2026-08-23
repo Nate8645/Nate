@@ -11,6 +11,7 @@
     "lint": "node scripts/lint-basic.js",
     "stripe:setup": "NODE_OPTIONS=--no-warnings node scripts/setup-stripe.js",
     "launch:check": "NODE_OPTIONS=--no-warnings node scripts/launch-check.js",
+    "env:prepare": "NODE_OPTIONS=--no-warnings node scripts/prepare-local-env.js",
     "seed": "NODE_OPTIONS=--no-warnings node scripts/seed.js"
   },
   "engines": {

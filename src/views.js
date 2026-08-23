@@ -352,7 +352,7 @@ function pricingCards(req, mode = 'public') {
         <p>${e(plan.description)}</p>
         <div class="price"><span>${money(plan.price)}</span><small>/${e(plan.cadence)}</small></div>
         <ul>${plan.features.map((item) => `<li>${e(item)}</li>`).join('')}</ul>
-        <p class="support-note">${e(plan.support)} · ${plan.kitLimit} kits/month</p>
+        <p class="support-note">${e(plan.support)} · ${plan.kitLimit} kits/month · ${plan.aiCredits || 0} AI credits · ${plan.agentSeats || 1} agent seats · ${plan.premiumIntegrations || 0} premium integrations</p>
         ${button}
       </article>`;
     }).join('')}
@@ -594,14 +594,24 @@ function agentsPage(req, { workspace, message = '', error = '' }) {
   });
 }
 
-function automationsPage(req, { rules, message = '', error = '' }) {
+function automationsPage(req, { snapshot, rules = null, message = '', error = '' }) {
+  const data = snapshot || { rules: rules || [], steps: [], agents: [] };
+  const stepsByRule = new Map();
+  for (const step of data.steps || []) {
+    const list = stepsByRule.get(step.rule_id) || [];
+    list.push(step);
+    stepsByRule.set(step.rule_id, list);
+  }
   return renderPage(req, {
     title: 'Automation Engine',
     active: '/automations',
     footerCta: false,
     description: 'Create triggers, conditions, actions, AI steps, and human approval workflows for UltraLaunch AI.',
-    content: `<section class="dashboard-hero premium-page"><div class="container dashboard-head"><div><p class="eyebrow">Automation engine</p><h1>Triggers, conditions, AI actions, human approval.</h1><p>Automate the repeatable parts of launch operations without losing control over critical actions.</p></div><a class="btn btn-secondary" href="/agents">AI agents</a></div></section>
-    <section class="section"><div class="container stack">${flashHtml(message, 'success')}${flashHtml(error, 'error')}<div class="automation-flow"><span>TRIGGER</span><em>→</em><span>AI</span><em>→</em><span>ACTION</span><em>→</em><span>HUMAN APPROVAL</span><em>→</em><span>COMPLETE</span></div></div><div class="container dashboard-grid"><form class="card form-card premium-form" method="post" action="/automations">${csrf(req)}<div><p class="eyebrow">New rule</p><h2>Create automation</h2></div><label>Name<input name="name" required maxlength="120" placeholder="High-intent pilot lead follow-up"></label><label>Trigger<select name="triggerType"><option value="launch_kit_generated">Launch kit generated</option><option value="pilot_request_submitted">Pilot request submitted</option><option value="support_ticket_created">Support ticket created</option><option value="weekly_schedule">Weekly schedule</option><option value="manual">Manual</option></select></label><label>Condition<textarea name="conditionText" required rows="3" maxlength="500" placeholder="If user is Free plan and generated first kit"></textarea></label><label>Action<textarea name="actionText" required rows="4" maxlength="700" placeholder="Prepare follow-up checklist and sprint CTA for approval"></textarea></label><label>Approval<select name="requiresApproval"><option value="yes">Human approval required</option><option value="no">Auto draft only</option></select></label><button class="btn" type="submit">Create rule</button></form><aside class="stack"><div class="card"><h2>Safety model</h2><ul><li>Drafting can be automated.</li><li>External account actions require connected accounts.</li><li>Terminal, file deletion, and purchases require explicit approval.</li></ul></div><div class="card"><h2>Performance</h2><p>Rules are stored as lightweight records today. They are ready for background workers or queue processing when deployed.</p></div></aside></div><div class="container"><div class="card table-card"><h2>Rules</h2>${rules.length ? rules.map((rule) => `<form class="ticket-admin" method="post" action="/automations/${rule.id}/toggle">${csrf(req)}<div><strong>${e(rule.name)}</strong><p>${e(rule.trigger_type)} → ${e(rule.action_text)}</p><span>${rule.is_enabled ? 'enabled' : 'disabled'} · ${rule.requires_approval ? 'approval required' : 'draft-only'} · ${formatDate(rule.created_at)}</span></div><button class="btn btn-small" type="submit">${rule.is_enabled ? 'Disable' : 'Enable'}</button></form>`).join('') : '<p>No rules yet.</p>'}</div></div></section>`,
+    content: `<section class="dashboard-hero premium-page"><div class="container dashboard-head"><div><p class="eyebrow">Automation engine</p><h1>Visual workflows: trigger → AI → action → approval.</h1><p>Build repeatable operating workflows. Each step can be draft-only or approval-gated before external execution.</p></div><a class="btn btn-secondary" href="/command">Command center</a></div></section>
+    <section class="section"><div class="container stack">${flashHtml(message, 'success')}${flashHtml(error, 'error')}<div class="automation-flow"><span>TRIGGER</span><em>→</em><span>AI</span><em>→</em><span>ACTION</span><em>→</em><span>HUMAN APPROVAL</span><em>→</em><span>COMPLETE</span></div></div><div class="container dashboard-grid"><form class="card form-card premium-form" method="post" action="/automations">${csrf(req)}<div><p class="eyebrow">New rule</p><h2>Create automation</h2></div><label>Name<input name="name" required maxlength="120" placeholder="High-intent pilot lead follow-up"></label><label>Trigger<select name="triggerType"><option value="launch_kit_generated">Launch kit generated</option><option value="pilot_request_submitted">Pilot request submitted</option><option value="support_ticket_created">Support ticket created</option><option value="weekly_schedule">Weekly schedule</option><option value="manual">Manual</option></select></label><label>Condition<textarea name="conditionText" required rows="3" maxlength="500" placeholder="If user is Free plan and generated first kit"></textarea></label><label>Action<textarea name="actionText" required rows="4" maxlength="700" placeholder="Prepare follow-up checklist and sprint CTA for approval"></textarea></label><label>Approval<select name="requiresApproval"><option value="yes">Human approval required</option><option value="no">Auto draft only</option></select></label><button class="btn" type="submit">Create rule</button></form><aside class="stack"><div class="card"><h2>Safety model</h2><ul><li>Drafting can be automated.</li><li>External account actions require connected accounts.</li><li>Terminal, file deletion, purchases, refunds, and live posts require explicit approval.</li></ul></div><div class="card"><h2>Worker-ready</h2><p>Rules and steps are stored separately so background queues can execute safe jobs later without rewriting the product.</p></div></aside></div><div class="container stack"><div class="card table-card"><h2>Rules + visual steps</h2>${data.rules.length ? data.rules.map((rule) => {
+      const ruleSteps = stepsByRule.get(rule.id) || [];
+      return `<article class="automation-rule"><form class="ticket-admin" method="post" action="/automations/${rule.id}/toggle">${csrf(req)}<div><strong>${e(rule.name)}</strong><p>${e(rule.trigger_type)} → ${e(rule.action_text)}</p><span>${rule.is_enabled ? 'enabled' : 'disabled'} · ${rule.requires_approval ? 'approval required' : 'draft-only'} · ${formatDate(rule.created_at)}</span></div><button class="btn btn-small" type="submit">${rule.is_enabled ? 'Disable' : 'Enable'}</button></form><div class="automation-step-list">${ruleSteps.length ? ruleSteps.map((step) => `<span>${e(step.step_order)}. ${e(step.step_type)} · ${e(step.agent_key || 'system')} · ${step.requires_approval ? 'approval' : 'draft'}</span>`).join('') : '<span>No custom steps yet.</span>'}</div><form class="automation-step-form" method="post" action="/automations/${rule.id}/steps">${csrf(req)}<select name="stepType"><option value="trigger">TRIGGER</option><option value="ai">AI</option><option value="condition">CONDITION</option><option value="action">ACTION</option><option value="approval">HUMAN APPROVAL</option><option value="complete">COMPLETE</option></select><select name="agentKey">${(data.agents || []).map((agent) => `<option value="${e(agent.key)}">${e(agent.name)}</option>`).join('')}</select><input name="actionText" required maxlength="900" placeholder="Describe this workflow step"><select name="requiresApproval"><option value="yes">Approval</option><option value="no">Draft-only</option></select><button class="btn btn-small" type="submit">Add step</button></form></article>`;
+    }).join('') : '<p>No rules yet.</p>'}</div></div></section>`,
   });
 }
 
@@ -754,6 +764,50 @@ function marketplacePage(req, { snapshot }) {
   });
 }
 
+function permissionsPage(req, { snapshot, message = '', error = '' }) {
+  return renderPage(req, {
+    title: 'Permission Matrix',
+    active: '/permissions',
+    footerCta: false,
+    description: 'Per-agent computer permission system with ALLOW, ASK, and DENY decisions for read, write, execute, browser, files, network, applications, and payments.',
+    content: `<section class="dashboard-hero premium-page"><div class="container dashboard-head"><div><p class="eyebrow">Computer Permission System</p><h1>Set ALLOW, ASK, or DENY per agent and capability.</h1><p>Each specialist agent can be constrained for read, write, execute, browser, files, network, applications, payments, desktop, terminal, memory, and connected accounts.</p></div><a class="btn btn-secondary" href="/security">Security center</a></div></section>
+    <section class="section"><div class="container dashboard-grid">${flashHtml(message, 'success')}${flashHtml(error, 'error')}<form class="card form-card" method="post" action="/permissions/rules">${csrf(req)}<h2>Update permission rule</h2><label>Agent<select name="agentKey">${snapshot.agents.map((agent) => `<option value="${e(agent.key)}">${e(agent.name)} · ${e(agent.department)}</option>`).join('')}</select></label><label>Permission<select name="permissionKey">${snapshot.permissions.map((permission) => `<option value="${e(permission.key)}">${e(permission.name)} · ${e(permission.risk)}</option>`).join('')}</select></label><label>Decision<select name="decision"><option value="ask">ASK before action</option><option value="allow">ALLOW safe action</option><option value="deny">DENY</option></select></label><button class="btn" type="submit">Save rule</button></form><aside class="card"><h2>Policy</h2><ul><li>Critical permissions default to ASK.</li><li>Payments, terminal, file deletion, desktop control, and connected-account writes require approval.</li><li>Denied rules block future execution planning for that capability.</li></ul></aside></div><div class="container"><div class="card table-card"><h2>Current matrix</h2>${table(['Agent','Permission','Decision','Updated'], snapshot.rules.slice(0, 220).map((rule) => [rule.agent_key, rule.permission_key, rule.decision, formatDate(rule.updated_at)]))}</div></div></section>`,
+  });
+}
+
+function computerPage(req, { snapshot, message = '', error = '' }) {
+  return renderPage(req, {
+    title: 'Desktop and Browser AI',
+    active: '/computer',
+    footerCta: false,
+    description: 'Safe desktop and browser automation planner with approval-gated actions and explainers.',
+    content: `<section class="dashboard-hero premium-page"><div class="container dashboard-head"><div><p class="eyebrow">Desktop + Browser AI</p><h1>Plan computer actions. Execute only after approval.</h1><p>Programs, files, browser workflows, screenshots, documents, and terminal tasks are translated into visible action explainers first.</p></div><a class="btn btn-secondary" href="/permissions">Permission matrix</a></div></section>
+    <section class="section"><div class="container dashboard-grid">${flashHtml(message, 'success')}${flashHtml(error, 'error')}<form class="card form-card" method="post" action="/computer/actions">${csrf(req)}<h2>Create action explainer</h2><label>Action type<select name="actionType"><option value="browser">Browser</option><option value="desktop">Desktop app</option><option value="file">File</option><option value="terminal">Terminal</option><option value="document">Document</option><option value="screenshot">Screenshot</option><option value="payment">Payment/refund</option></select></label><label>WHAT<input name="what" required maxlength="240" placeholder="Open Shopify analytics and prepare conversion report"></label><label>WHY<textarea name="why" required rows="3" maxlength="700"></textarea></label><label>DATA USED<textarea name="dataUsed" rows="3" maxlength="700" placeholder="Approved account context, screenshots, analytics export, etc."></textarea></label><label>TOOL<input name="tool" maxlength="160" placeholder="Browser planner, file planner, terminal planner"></label><label>EXPECTED RESULT<textarea name="expectedResult" required rows="3" maxlength="700"></textarea></label><button class="btn" type="submit">Create approval request</button></form><aside class="card"><h2>Safety rails</h2><ul>${snapshot.safety.map((item) => `<li>${e(item)}</li>`).join('')}</ul></aside></div><div class="container stack"><div class="card table-card"><h2>Computer approvals</h2>${snapshot.approvals.length ? snapshot.approvals.map((approval) => approvalCard(req, approval, '/computer')).join('') : '<p>No computer approvals yet.</p>'}</div><div class="card table-card"><h2>Computer task queue</h2>${table(['Agent','Task','Status','Priority'], snapshot.tasks.map((task) => [task.agent_key, task.title, task.status, task.priority]))}</div></div></section>`,
+  });
+}
+
+function mobileCommandPage(req, { snapshot }) {
+  return renderPage(req, {
+    title: 'Mobile Command Center',
+    active: '/mobile',
+    footerCta: false,
+    description: 'Mobile-ready command center for AI chat, agents, tasks, approvals, notifications, analytics, security, and activity.',
+    content: `<section class="dashboard-hero premium-page mobile-command"><div class="container"><p class="eyebrow">Mobile Command Center</p><h1>Approve important AI work from your phone.</h1><p>Designed for iPhone-style workflows: chat, tasks, approvals, notifications, analytics, security, and activity without desktop complexity.</p><div class="mini-link-grid"><a href="/command">Chat</a><a href="/tasks">Tasks</a><a href="/security">Approvals</a><a href="/analytics">Analytics</a><a href="/agents">Agents</a><a href="/voice">Voice</a></div></div></section>
+    <section class="section"><div class="container stack"><div class="card table-card"><h2>Mobile approvals</h2>${snapshot.approvals.length ? snapshot.approvals.map((approval) => approvalCard(req, approval, '/mobile')).join('') : '<p>No pending approvals.</p>'}</div><div class="card table-card"><h2>Notifications</h2>${table(['Severity','Signal','Action'], snapshot.notifications.map((signal) => [signal.severity, signal.title, signal.recommended_action]))}</div><div class="card table-card"><h2>Recent tasks</h2>${table(['Agent','Task','Status'], snapshot.command.tasks.slice(0, 8).map((task) => [task.agent_key, task.title, task.status]))}</div></div></section>`,
+  });
+}
+
+function voiceCommandPage(req, { snapshot }) {
+  return renderPage(req, {
+    title: 'Voice Command Center',
+    active: '/voice',
+    footerCta: false,
+    description: 'Voice AI readiness for speech-to-text, text-to-speech, realtime AI, and permissioned commands.',
+    content: `<section class="dashboard-hero premium-page"><div class="container dashboard-head"><div><p class="eyebrow">Voice Command Center</p><h1>Voice-ready architecture. No microphone is active yet.</h1><p>Voice commands will route through the same orchestrator, permissions, approvals, memory, and audit logs as text commands.</p></div><a class="btn btn-secondary" href="/command">Text command</a></div></section>
+    <section class="section"><div class="container stack"><div class="admin-grid"><div class="card table-card"><h2>Prepared voice intents</h2>${table(['Intent','Example command','Agent'], snapshot.intents.map((intent) => intent))}</div><div class="card"><h2>Realtime readiness</h2><ul>${snapshot.readiness.map((item) => `<li>${e(item)}</li>`).join('')}</ul></div></div><div class="card"><h2>Permission rule</h2><p>Voice can ask for work, but it cannot bypass approvals. “Starte den Marketing-Agenten” can queue a task. “Sende diese E-Mail” still requires the relevant notification/connected-account approval.</p></div></div></section>`,
+  });
+}
+
 function billingPage(req, { message = '', error = '' } = {}) {
   const plan = getPlan(req.user.plan);
   return renderPage(req, {
@@ -763,6 +817,7 @@ function billingPage(req, { message = '', error = '' } = {}) {
     content: `<section class="dashboard-hero"><div class="container"><p class="eyebrow">Billing</p><h1>Manage subscription</h1><p>Current plan: <strong>${e(plan.name)}</strong> · status: <strong>${e(req.user.subscriptionStatus)}</strong></p>${flashHtml(message, 'success')}${flashHtml(error, 'error')}</div></section>
     <section class="section"><div class="container stack">
       ${pricingCards(req, 'billing')}
+      <div class="card"><h2>AI Operating System entitlements</h2><div class="metric-grid mini">${metric('AI credits', plan.aiCredits || 0)}${metric('Agent seats', plan.agentSeats || 1)}${metric('Premium integrations', plan.premiumIntegrations || 0)}${metric('Critical actions', 'approval-gated')}</div><p class="muted-text">Usage billing, credit packs, premium connectors, agent seats, and enterprise controls are technically modeled here. No charges occur unless the user explicitly starts Stripe Checkout.</p></div>
       <div class="card billing-actions"><div><h2>${e(pilotOffer.name)}</h2><p>${e(pilotOffer.description)}</p></div><form method="post" action="/billing/checkout-pilot">${csrf(req)}<button class="btn" type="submit">Buy ${money(pilotOffer.price)} sprint</button></form></div>
       <div class="card billing-actions"><h2>Customer Portal</h2><p>Use Stripe Customer Portal to upgrade, downgrade, cancel, update payment method, and download invoices.</p><form method="post" action="/billing/portal">${csrf(req)}<button class="btn btn-secondary" type="submit">Open customer portal</button></form></div>
     </div></section>`,
@@ -871,6 +926,10 @@ module.exports = {
   securityPage,
   analyticsPage,
   marketplacePage,
+  permissionsPage,
+  computerPage,
+  mobileCommandPage,
+  voiceCommandPage,
   agentsPage,
   automationsPage,
   trustCenterPage,

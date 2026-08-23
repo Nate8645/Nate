@@ -21,6 +21,9 @@ It includes:
 - Trust/Security Center with permission controls, action explainers, kill switch, session visibility, AI action history, memory deletion, connected-account readiness, and JSON data export
 - Automation Engine with triggers, conditions, actions, schedules, proactive autopilot signals, and human-approval gates
 - Knowledge Base / Files / Projects layer for notes, URLs, PDFs, documents, screenshots, databases, and cloud-storage references
+- Computer Permission Matrix with per-agent ALLOW / ASK / DENY rules
+- Desktop + Browser AI planner with action explainers before critical work
+- Mobile and Voice Command Center readiness for iPhone approval flows and future STT/TTS/realtime AI
 - Customer support contact and ticket flow
 - SEO assets: sitemap, robots, metadata
 - Security baseline: password hashing, CSRF, rate limits, verified webhooks, env-based secrets

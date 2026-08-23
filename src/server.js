@@ -11,7 +11,7 @@ const { activeAiProvider, buildFallbackKit, generateLaunchKit } = require('./ai'
 const { stripeClient, createCheckoutSession, createPilotCheckoutSession, createPortalSession, stripeWebhookHandler, syncCheckoutSession } = require('./stripe');
 const { launchReadiness } = require('./launch-readiness');
 const { ensureTrustDefaults, logAction, upsertMemory, userTrustSnapshot, agentWorkspace, createAgentTask, exportUserData, permissionCatalog } = require('./intelligence');
-const { commandCenterSnapshot, orchestrateCommand, integrationSnapshot, installIntegration, testIntegration, disconnectIntegration, projectsSnapshot, createProject, createKnowledgeSource, memorySnapshot, createMemory, securitySnapshot, setKillSwitch, decideApproval, analyticsSnapshot, marketplaceSnapshot, tasksSnapshot, createAiEmployee } = require('./platform');
+const { commandCenterSnapshot, orchestrateCommand, integrationSnapshot, installIntegration, testIntegration, disconnectIntegration, projectsSnapshot, createProject, createKnowledgeSource, memorySnapshot, createMemory, securitySnapshot, setKillSwitch, decideApproval, analyticsSnapshot, marketplaceSnapshot, tasksSnapshot, permissionMatrixSnapshot, updateAgentPermissionRule, automationBuilderSnapshot, addAutomationStep, computerSnapshot, createComputerActionApproval, mobileSnapshot, voiceSnapshot, createAiEmployee } = require('./platform');
 const views = require('./views');
 
 function createApp(options = {}) {
@@ -263,6 +263,56 @@ function createApp(options = {}) {
     res.redirect('/security?message=Kill%20switch%20updated');
   });
 
+  app.get('/permissions', requireAuth, (req, res) => {
+    res.send(views.permissionsPage(req, { snapshot: permissionMatrixSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/permissions/rules', requireAuth, (req, res) => {
+    try {
+      updateAgentPermissionRule(db, {
+        userId: req.user.id,
+        agentKey: safeText(req.body.agentKey, 120),
+        permissionKey: safeText(req.body.permissionKey, 120),
+        decision: safeChoice(req.body.decision, ['allow', 'ask', 'deny'], 'ask'),
+      });
+      res.redirect('/permissions?message=Permission%20rule%20updated');
+    } catch (error) {
+      res.redirect(`/permissions?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.get('/computer', requireAuth, (req, res) => {
+    res.send(views.computerPage(req, { snapshot: computerSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/computer/actions', requireAuth, rateLimit({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'computer-action' }), (req, res) => {
+    try {
+      const actionType = safeChoice(req.body.actionType, ['browser', 'desktop', 'file', 'terminal', 'document', 'screenshot', 'payment'], 'browser');
+      const permissionMap = { browser: 'browser', desktop: 'desktop_control', file: 'file_management', terminal: 'terminal_actions', document: 'document_processing', screenshot: 'document_processing', payment: 'payments' };
+      createComputerActionApproval(db, {
+        userId: req.user.id,
+        actionType,
+        what: safeText(req.body.what, 240),
+        why: safeText(req.body.why, 700),
+        dataUsed: safeText(req.body.dataUsed, 700, false) || 'User-provided command and approved workspace context.',
+        tool: safeText(req.body.tool, 160, false) || `${actionType} planner`,
+        expectedResult: safeText(req.body.expectedResult, 700),
+        permissionKey: permissionMap[actionType],
+      });
+      res.redirect('/computer?message=Computer%20action%20approval%20created');
+    } catch (error) {
+      res.redirect(`/computer?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.get('/mobile', requireAuth, (req, res) => {
+    res.send(views.mobileCommandPage(req, { snapshot: mobileSnapshot(db, req.user.id) }));
+  });
+
+  app.get('/voice', requireAuth, (req, res) => {
+    res.send(views.voiceCommandPage(req, { snapshot: voiceSnapshot(db, req.user.id) }));
+  });
+
   app.get('/analytics', requireAuth, (req, res) => {
     res.send(views.analyticsPage(req, { snapshot: analyticsSnapshot(db, req.user.id) }));
   });
@@ -324,9 +374,7 @@ function createApp(options = {}) {
   });
 
   app.get('/automations', requireAuth, (req, res) => {
-    ensureTrustDefaults(db, req.user.id);
-    const rules = all(db, 'SELECT * FROM automation_rules WHERE user_id = :userId ORDER BY created_at DESC', { userId: req.user.id });
-    res.send(views.automationsPage(req, { rules, message: req.query.message || '', error: req.query.error || '' }));
+    res.send(views.automationsPage(req, { snapshot: automationBuilderSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
   });
 
   app.post('/automations', requireAuth, rateLimit({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'automation' }), (req, res) => {
@@ -349,6 +397,22 @@ function createApp(options = {}) {
       });
       logAction(db, { userId: req.user.id, agentKey: 'ops-automation', actionType: 'automation_rule_created', status: 'created', riskLevel: requiresApproval ? 'medium' : 'low', permissionKey: 'workflow_automation', summary: `Automation rule created: ${name}` });
       res.redirect('/automations?message=Automation%20created');
+    } catch (error) {
+      res.redirect(`/automations?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.post('/automations/:id/steps', requireAuth, (req, res) => {
+    try {
+      addAutomationStep(db, {
+        userId: req.user.id,
+        ruleId: req.params.id,
+        stepType: safeChoice(req.body.stepType, ['trigger', 'ai', 'action', 'approval', 'condition', 'complete'], 'ai'),
+        agentKey: safeText(req.body.agentKey, 120, false) || 'automation-agent',
+        actionText: safeText(req.body.actionText, 900),
+        requiresApproval: req.body.requiresApproval === 'no' ? 0 : 1,
+      });
+      res.redirect('/automations?message=Automation%20step%20added');
     } catch (error) {
       res.redirect(`/automations?error=${encodeURIComponent(error.message)}`);
     }

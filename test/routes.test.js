@@ -120,6 +120,24 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     const automationsHtml = await res.text();
     assert.equal(res.status, 200);
     assert.match(automationsHtml, /Automation engine/);
+    assert.match(automationsHtml, /TRIGGER/);
+    const automationRuleId = automationsHtml.match(/\/automations\/(\d+)\/steps/)?.[1];
+    assert.ok(automationRuleId);
+    const automationCsrf = extractCsrf(automationsHtml);
+
+    res = await request(`/automations/${automationRuleId}/steps`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: automationCsrf,
+        stepType: 'ai',
+        agentKey: 'automation-agent',
+        actionText: 'Analyze trigger data and prepare next safe action',
+        requiresApproval: 'yes',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/automations?message=Automation%20step%20added');
 
     res = await request('/command');
     const commandHtml = await res.text();
@@ -186,6 +204,58 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.equal(res.status, 200);
     assert.match(marketplaceHtml, /AI Agent Marketplace/);
     assert.match(marketplaceHtml, /CEO Agent/);
+
+    res = await request('/permissions');
+    const permissionsHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(permissionsHtml, /Computer Permission System/);
+    const permissionsCsrf = extractCsrf(permissionsHtml);
+
+    res = await request('/permissions/rules', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: permissionsCsrf,
+        agentKey: 'browser-agent',
+        permissionKey: 'browser',
+        decision: 'ask',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/permissions?message=Permission%20rule%20updated');
+
+    res = await request('/computer');
+    const computerHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(computerHtml, /Desktop \+ Browser AI/);
+    const computerCsrf = extractCsrf(computerHtml);
+
+    res = await request('/computer/actions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: computerCsrf,
+        actionType: 'browser',
+        what: 'Open Shopify analytics and prepare a conversion report',
+        why: 'The operator needs a safe browser workflow plan',
+        dataUsed: 'Approved Shopify context only',
+        tool: 'Browser planner',
+        expectedResult: 'Approval-gated steps for the operator to review',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/computer?message=Computer%20action%20approval%20created');
+
+    res = await request('/mobile');
+    const mobileHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(mobileHtml, /Mobile Command Center/);
+
+    res = await request('/voice');
+    const voiceHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(voiceHtml, /Voice Command Center/);
+    assert.match(voiceHtml, /No microphone is active yet/);
 
     res = await request('/product');
     const productHtml = await res.text();

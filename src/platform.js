@@ -34,7 +34,7 @@ const integrationCatalog = [
 ];
 
 const commandNavigation = [
-  ['Dashboard', '/dashboard'], ['AI Chat', '/command'], ['Agents', '/agents'], ['Tasks', '/tasks'], ['Automations', '/automations'], ['Integrations', '/integrations'], ['Files', '/files'], ['Projects', '/projects'], ['Analytics', '/analytics'], ['Security', '/security'], ['Permissions', '/trust'], ['Billing', '/billing'], ['Memory', '/memory'], ['Activity Logs', '/trust'],
+  ['Dashboard', '/dashboard'], ['AI Chat', '/command'], ['Agents', '/agents'], ['Tasks', '/tasks'], ['Automations', '/automations'], ['Integrations', '/integrations'], ['Files', '/files'], ['Projects', '/projects'], ['Analytics', '/analytics'], ['Security', '/security'], ['Permissions', '/permissions'], ['Billing', '/billing'], ['Memory', '/memory'], ['Activity Logs', '/trust'],
 ];
 
 function provider(key, name, description, authScopes, permissions, tools) {
@@ -585,6 +585,129 @@ function tasksSnapshot(db, userId) {
   };
 }
 
+function permissionMatrixSnapshot(db, userId) {
+  ensurePlatformDefaults(db, userId);
+  return {
+    agents: agentCatalog,
+    permissions: permissionCatalog,
+    rules: all(db, 'SELECT * FROM agent_permission_rules WHERE user_id = :userId ORDER BY agent_key, permission_key', { userId }),
+  };
+}
+
+function updateAgentPermissionRule(db, { userId, agentKey, permissionKey, decision }) {
+  const agent = agentCatalog.find((item) => item.key === agentKey);
+  const permission = permissionCatalog.find((item) => item.key === permissionKey);
+  if (!agent) throw new Error('Unknown agent.');
+  if (!permission) throw new Error('Unknown permission.');
+  const safeDecision = ['allow', 'ask', 'deny'].includes(decision) ? decision : 'ask';
+  run(db, `INSERT INTO agent_permission_rules (user_id, agent_key, permission_key, decision, created_at, updated_at)
+           VALUES (:userId, :agentKey, :permissionKey, :decision, :createdAt, :updatedAt)
+           ON CONFLICT(user_id, agent_key, permission_key) DO UPDATE SET decision = excluded.decision, updated_at = excluded.updated_at`, {
+    userId,
+    agentKey,
+    permissionKey,
+    decision: safeDecision,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+  logAction(db, { userId, agentKey: 'security-agent', actionType: 'agent_permission_rule_changed', status: safeDecision, riskLevel: permission.risk, permissionKey, summary: `${agent.name} permission ${permission.name} set to ${safeDecision}` });
+}
+
+function automationBuilderSnapshot(db, userId) {
+  ensurePlatformDefaults(db, userId);
+  const rules = all(db, 'SELECT * FROM automation_rules WHERE user_id = :userId ORDER BY created_at DESC', { userId });
+  const steps = all(db, 'SELECT * FROM automation_steps WHERE user_id = :userId ORDER BY rule_id, step_order', { userId });
+  return { rules, steps, agents: agentCatalog };
+}
+
+function addAutomationStep(db, { userId, ruleId, stepType, agentKey, actionText, requiresApproval = 1 }) {
+  const rule = one(db, 'SELECT * FROM automation_rules WHERE id = :id AND user_id = :userId', { id: Number(ruleId), userId });
+  if (!rule) throw new Error('Automation rule not found.');
+  const current = Number(one(db, 'SELECT COALESCE(MAX(step_order), 0) AS n FROM automation_steps WHERE rule_id = :ruleId AND user_id = :userId', { ruleId: Number(ruleId), userId })?.n || 0);
+  const agent = agentCatalog.find((item) => item.key === agentKey) || agentCatalog.find((item) => item.key === 'automation-agent');
+  run(db, `INSERT INTO automation_steps (user_id, rule_id, step_order, step_type, agent_key, action_text, requires_approval, config_json, created_at, updated_at)
+           VALUES (:userId, :ruleId, :stepOrder, :stepType, :agentKey, :actionText, :requiresApproval, :configJson, :createdAt, :updatedAt)`, {
+    userId,
+    ruleId: Number(ruleId),
+    stepOrder: current + 1,
+    stepType,
+    agentKey: agent?.key || 'automation-agent',
+    actionText: String(actionText).slice(0, 900),
+    requiresApproval,
+    configJson: JSON.stringify({ visualBuilder: true, approvalModel: requiresApproval ? 'human_required' : 'draft_only' }),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+  logAction(db, { userId, agentKey: agent?.key || 'automation-agent', actionType: 'automation_step_created', status: 'created', riskLevel: requiresApproval ? 'medium' : 'low', permissionKey: 'workflow_automation', summary: `Automation step added to ${rule.name}` });
+}
+
+function createComputerActionApproval(db, { userId, actionType, what, why, dataUsed, tool, expectedResult, permissionKey }) {
+  ensurePlatformDefaults(db, userId);
+  const agentKey = actionType === 'browser' ? 'browser-agent' : actionType === 'file' ? 'file-agent' : actionType === 'terminal' ? 'desktop-agent' : 'computer-control';
+  const taskId = createAgentTask(db, {
+    userId,
+    agentKey,
+    title: what,
+    priority: 'urgent',
+    requiresApproval: 1,
+  });
+  createApproval(db, {
+    userId,
+    runId: null,
+    taskId,
+    agentKey,
+    title: what,
+    tool,
+    permissionKey,
+    riskLevel: ['terminal', 'desktop', 'payment', 'file'].includes(actionType) ? 'critical' : 'high',
+    why,
+    dataUsed,
+    expectedResult,
+  });
+}
+
+function computerSnapshot(db, userId) {
+  ensurePlatformDefaults(db, userId);
+  return {
+    approvals: all(db, `SELECT * FROM action_approvals WHERE user_id = :userId AND permission_key IN ('desktop_control','browser','files','file_management','terminal_actions','applications','payments') ORDER BY created_at DESC LIMIT 30`, { userId }),
+    tasks: all(db, `SELECT * FROM agent_tasks WHERE user_id = :userId AND agent_key IN ('computer-control','browser-agent','desktop-agent','file-agent') ORDER BY created_at DESC LIMIT 30`, { userId }),
+    safety: [
+      'No hidden desktop control.',
+      'No captcha bypass or 2FA bypass.',
+      'No purchases, refunds, deletion, terminal execution, or external writes without explicit approval.',
+      'Every planned action creates a WHAT / WHY / DATA / TOOL / RESULT / RISK explainer.',
+    ],
+  };
+}
+
+function mobileSnapshot(db, userId) {
+  const command = commandCenterSnapshot(db, userId);
+  return {
+    command,
+    approvals: all(db, `SELECT * FROM action_approvals WHERE user_id = :userId AND status = 'pending' ORDER BY created_at DESC LIMIT 8`, { userId }),
+    notifications: all(db, `SELECT * FROM autopilot_signals WHERE user_id = :userId AND status = 'open' ORDER BY created_at DESC LIMIT 8`, { userId }),
+  };
+}
+
+function voiceSnapshot(db, userId) {
+  ensurePlatformDefaults(db, userId);
+  return {
+    intents: [
+      ['sales_report', 'Hey AI, analysiere meine Verkäufe.', 'analytics-agent'],
+      ['start_marketing', 'Starte den Marketing-Agenten.', 'marketing-agent'],
+      ['daily_summary', 'Was ist heute passiert?', 'operations-agent'],
+      ['open_tasks', 'Welche Aufgaben sind offen?', 'ceo-agent'],
+      ['security_check', 'Prüfe meine offenen Sicherheitsfreigaben.', 'security-agent'],
+    ],
+    readiness: [
+      'Speech-to-text adapter prepared; no microphone recording is active.',
+      'Text-to-speech adapter prepared for summaries and briefings.',
+      'Realtime AI channel should reuse the same orchestrator and approval system.',
+      'Voice commands never bypass permissions or approvals.',
+    ],
+  };
+}
+
 module.exports = {
   commandNavigation,
   integrationCatalog,
@@ -607,5 +730,13 @@ module.exports = {
   analyticsSnapshot,
   marketplaceSnapshot,
   tasksSnapshot,
+  permissionMatrixSnapshot,
+  updateAgentPermissionRule,
+  automationBuilderSnapshot,
+  addAutomationStep,
+  computerSnapshot,
+  createComputerActionApproval,
+  mobileSnapshot,
+  voiceSnapshot,
   createAiEmployee,
 };

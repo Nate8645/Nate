@@ -718,3 +718,9 @@ body::before {
 .permission-picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
 .permission-picker label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.11); color: var(--muted); font-size: .78rem; font-weight: 800; }
 .install-form { display: grid; gap: 8px; }
+.automation-rule { border: 1px solid rgba(255,255,255,.12); border-radius: 22px; padding: 14px; background: rgba(255,255,255,.045); margin-bottom: 12px; }
+.automation-step-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.automation-step-list span { border-radius: 999px; border: 1px solid rgba(145,255,240,.22); background: rgba(145,255,240,.08); color: #cffff8; padding: 8px 10px; font-weight: 850; font-size: .82rem; }
+.automation-step-form { display: grid; grid-template-columns: 130px 190px minmax(220px, 1fr) 120px auto; gap: 8px; align-items: center; }
+.mobile-command .mini-link-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .automation-step-form { grid-template-columns: 1fr; } .mobile-command .mini-link-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -397,6 +397,23 @@ function runMigrations(db) {
 
     CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_user ON scheduled_jobs(user_id, status);
 
+    CREATE TABLE IF NOT EXISTS automation_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      rule_id INTEGER NOT NULL REFERENCES automation_rules(id) ON DELETE CASCADE,
+      step_order INTEGER NOT NULL DEFAULT 1,
+      step_type TEXT NOT NULL DEFAULT 'ai',
+      agent_key TEXT,
+      action_text TEXT NOT NULL,
+      requires_approval INTEGER NOT NULL DEFAULT 1,
+      config_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_automation_steps_rule ON automation_steps(rule_id, step_order);
+    CREATE INDEX IF NOT EXISTS idx_automation_steps_user ON automation_steps(user_id, rule_id);
+
     CREATE TABLE IF NOT EXISTS autopilot_signals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

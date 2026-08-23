@@ -13,7 +13,7 @@ Goal: maximize the chance of one real paying customer within 24 hours without fa
 - Primary paid wedge: a subscription AI launch-kit workspace plus a manually sellable paid pilot.
 - Offer for first customer:
   - Free account: 3 launch kits/month
-  - Paid pilot: $99–$299 for a guided launch kit review and 24-hour customer acquisition sprint
+  - Paid pilot: $199 for a guided launch kit review and 24-hour customer acquisition sprint
   - Subscription upsell: Starter $19/mo, Pro $49/mo, Business $149/mo
 
 ## 2–8h — Build
@@ -111,7 +111,7 @@ CTA:
 
 Offer:
 
-> I’ll create the complete launch kit for your current offer, review it with you live, and help you send the first 25 outreach messages. Pilot price: $99–$299. If it is not useful, do not continue. If you subscribe, I credit the pilot fee toward your first months.
+> I’ll create the complete launch kit for your current offer, review it with you live, and help you send the first 25 outreach messages. Pilot price: $199. If it is not useful, do not continue. If you subscribe, I credit the pilot fee toward your first months.
 
 Track:
 

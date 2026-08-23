@@ -88,6 +88,29 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.match(adminHtml, /Operating cockpit/);
     assert.match(adminHtml, /Launch kits/);
 
+    res = await request('/pilot');
+    const pilotHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(pilotHtml, /Concierge Launch Sprint/);
+    const pilotCsrf = extractCsrf(pilotHtml);
+
+    res = await request('/pilot/request', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: pilotCsrf,
+        name: 'Launch Admin',
+        email: 'admin@example.com',
+        company: 'RetentionPilot',
+        website: 'https://example.com',
+        offer: 'Need first paid Shopify audit customer',
+        urgency: 'Need first customer this week',
+        budget: 'Ready for $199 sprint',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.match(res.headers.get('location'), /^\/pilot\?message=/);
+
     res = await request('/billing');
     const billingHtml = await res.text();
     assert.equal(res.status, 200);
@@ -101,6 +124,17 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     });
     assert.equal(res.status, 412);
     assert.match(await res.text(), /Stripe is technically implemented/);
+
+    res = await request('/billing');
+    const billingHtml2 = await res.text();
+    const csrf4 = extractCsrf(billingHtml2);
+    res = await request('/billing/checkout-pilot', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ csrf_token: csrf4 }),
+    });
+    assert.equal(res.status, 412);
+    assert.match(await res.text(), /STRIPE_PRICE_PILOT/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     app.locals.close?.();

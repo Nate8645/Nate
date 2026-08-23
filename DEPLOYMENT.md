@@ -32,6 +32,7 @@ STRIPE_WEBHOOK_SECRET=<your_webhook_signing_secret>
 STRIPE_PRICE_STARTER=<starter_price_id>
 STRIPE_PRICE_PRO=<pro_price_id>
 STRIPE_PRICE_BUSINESS=<business_price_id>
+STRIPE_PRICE_PILOT=<one_time_pilot_price_id>
 ```
 
 ## 2. Persistent database
@@ -76,9 +77,12 @@ Run locally and in production:
 - Download launch kit JSON.
 - Open support ticket.
 - Visit admin page and see metrics/tickets.
-- Start paid checkout in Stripe test mode.
+- Submit a pilot request and confirm it appears in Admin.
+- Start paid subscription checkout in Stripe test mode.
 - Complete test subscription.
 - Confirm webhook changes plan and status.
+- Start Concierge Launch Sprint checkout in Stripe test mode.
+- Confirm webhook records a paid order.
 - Open Stripe Customer Portal.
 - Upgrade/downgrade/cancel in portal.
 - Confirm user status updates after webhook.

@@ -1,6 +1,6 @@
 'use strict';
 
-const { publicPlans, getPlan } = require('./plans');
+const { publicPlans, getPlan, pilotOffer } = require('./plans');
 
 function e(value) {
   return String(value ?? '')
@@ -72,6 +72,7 @@ function renderPage(req, { title, description = 'AI launch workspace for founder
         ${navLink(currentPath, '/', 'Home')}
         ${navLink(currentPath, '/features', 'Features')}
         ${navLink(currentPath, '/pricing', 'Pricing')}
+        ${navLink(currentPath, '/pilot', 'Pilot')}
         ${navLink(currentPath, '/use-cases', 'Use cases')}
         ${navLink(currentPath, '/faq', 'FAQ')}
         ${navLink(currentPath, '/contact', 'Contact')}
@@ -138,11 +139,12 @@ function heroPage(req) {
           <h1>Build a launch-ready offer, website story, and outbound pack in minutes.</h1>
           <p class="hero-subtitle">UltraLaunch AI helps founders, consultants, agencies, and ecommerce operators transform a rough idea into a focused launch kit: ICP, positioning, pricing, landing copy, SEO briefs, social scripts, and a 24-hour execution plan.</p>
           <div class="hero-actions">
-            <a class="btn" href="/register">Start free</a>
-            <a class="btn btn-secondary" href="/pricing">See pricing</a>
+            <a class="btn" href="/register">Generate free launch kit</a>
+            <a class="btn btn-secondary" href="/pilot">Book $199 launch sprint</a>
           </div>
           <div class="trust-row" aria-label="Product proof points">
             <span>✓ No card for Free</span>
+            <span>✓ $199 concierge sprint for first-customer speed</span>
             <span>✓ Stripe-ready subscriptions</span>
             <span>✓ Built-in usage tracking</span>
           </div>
@@ -204,7 +206,18 @@ function heroPage(req) {
           <div><span>03</span><h3>Sell and iterate</h3><p>Track usage, export assets, open support tickets, and upgrade when outbound volume grows.</p></div>
         </div>
       </div>
-    </section>`,
+    </section>
+
+    <section class="section">
+      <div class="container cta-card secondary-offer">
+        <div>
+          <p class="eyebrow">Fastest path to revenue</p>
+          <h2>Need a customer this week? Buy the ${money(pilotOffer.price)} Concierge Launch Sprint.</h2>
+          <p>We refine one launch kit with you, tighten the landing-page hero and pricing, prepare the first 25 personalized outreach messages, and give you a close script. No revenue guarantee — just a concrete sprint to create real sales conversations.</p>
+        </div>
+        <a class="btn btn-light" href="/pilot">See sprint offer</a>
+      </div>
+    </section>`, 
   });
 }
 
@@ -261,7 +274,23 @@ function pricingPage(req, message = '') {
     description: 'Simple AI SaaS subscriptions with free trial, Starter, Pro, and Business plans.',
     content: `<section class="page-hero"><div class="container"><p class="eyebrow">Pricing</p><h1>Start free. Upgrade when launch volume grows.</h1><p>Flat monthly plans with visible usage limits. Stripe Checkout and Customer Portal are wired for subscription management.</p>${flashHtml(message)}</div></section>
     <section class="section"><div class="container">${pricingCards(req)}</div></section>
-    <section class="section muted"><div class="container split"><div><h2>What counts as usage?</h2><p>Each generated launch kit counts as one unit. Page visits, support tickets, and billing actions do not reduce your kit allowance.</p></div><div class="card"><h3>Need more?</h3><p>Business customers can request higher limits, team workflows, or white-label agency reports through support.</p><a class="text-link" href="/contact">Talk to us →</a></div></div></section>`,
+    <section class="section muted"><div class="container cta-card secondary-offer"><div><p class="eyebrow">Need help converting now?</p><h2>${e(pilotOffer.name)} · ${money(pilotOffer.price)} one-time</h2><p>${e(pilotOffer.description)}</p></div><a class="btn btn-light" href="/pilot">See sprint offer</a></div></section>
+    <section class="section"><div class="container split"><div><h2>What counts as usage?</h2><p>Each generated launch kit counts as one unit. Page visits, support tickets, and billing actions do not reduce your kit allowance.</p></div><div class="card"><h3>Need more?</h3><p>Business customers can request higher limits, team workflows, or white-label agency reports through support.</p><a class="text-link" href="/contact">Talk to us →</a></div></div></section>`, 
+  });
+}
+
+function pilotPage(req, { message = '', error = '' } = {}) {
+  const checkoutForm = req.user
+    ? `<form method="post" action="/billing/checkout-pilot">${csrf(req)}<button class="btn" type="submit">Buy ${money(pilotOffer.price)} sprint</button></form>`
+    : `<a class="btn" href="/register">Create account to buy sprint</a>`;
+  return renderPage(req, {
+    title: 'Concierge Launch Sprint',
+    active: '/pilot',
+    description: 'A $199 founder-led sprint to refine one launch kit and prepare first-customer outreach.',
+    content: `<section class="page-hero"><div class="container"><p class="eyebrow">Money-first offer</p><h1>Buy the ${money(pilotOffer.price)} sprint when you need sales conversations now.</h1><p>${e(pilotOffer.description)} No fake guarantees, no ad spend, no vague consulting — only launch assets and outbound preparation you can execute immediately.</p>${flashHtml(message, 'success')}${flashHtml(error, 'error')}<div class="hero-actions">${checkoutForm}<a class="btn btn-secondary" href="#request">Request fit check</a></div></div></section>
+    <section class="section"><div class="container split"><div><p class="eyebrow">Deliverables</p><h2>A productized service wedge that can close before subscriptions scale.</h2><p class="muted-text">The fastest first revenue path is a low-friction paid implementation sprint. The SaaS subscription keeps value recurring after the sprint.</p></div><div class="card-grid two-col">${pilotOffer.deliverables.map((item) => `<article class="card"><h3>${e(item)}</h3><p>Designed to create a concrete next selling action within 24 hours.</p></article>`).join('')}</div></div></section>
+    <section class="section muted"><div class="container steps"><div><span>01</span><h3>Generate the free kit</h3><p>Create the first draft in the dashboard and expose the buyer, offer, pricing, and outreach path.</p></div><div><span>02</span><h3>Refine with sprint</h3><p>We tighten one offer, prepare the first outreach batch, and clarify the sales ask.</p></div><div><span>03</span><h3>Convert or learn</h3><p>You send the messages, measure replies, and either close a customer or update the offer from real objections.</p></div></div></section>
+    <section class="section" id="request"><div class="container form-layout"><form class="card form-card" method="post" action="/pilot/request">${csrf(req)}<div><p class="eyebrow">Fit check</p><h2>Request a pilot review</h2><p class="muted-text">Use this if you want us to review fit before buying, or if Stripe is not configured yet.</p></div><label>Name<input name="name" required maxlength="80" value="${e(req.user?.name || '')}"></label><label>Email<input type="email" name="email" required maxlength="120" value="${e(req.user?.email || '')}"></label><label>Company<input name="company" maxlength="120" placeholder="Company or project"></label><label>Website<input name="website" maxlength="200" placeholder="Optional"></label><label>What are you trying to sell?<textarea name="offer" required maxlength="1200" rows="5" placeholder="Describe the offer, buyer, and current obstacle."></textarea></label><div class="form-grid two"><label>Urgency<select name="urgency"><option>Need first customer this week</option><option>Launching in 30 days</option><option>Testing positioning</option><option>Agency/client workflow</option></select></label><label>Budget comfort<select name="budget"><option>Ready for $199 sprint</option><option>Need free kit first</option><option>Considering subscription only</option><option>Not sure yet</option></select></label></div><button class="btn" type="submit">Request fit check</button></form><aside class="card side-card"><h2>Who should buy?</h2><ul><li>You can act on outreach within 24–48 hours.</li><li>You own the offer or buying decision.</li><li>You want a paid pilot or subscription-ready funnel.</li><li>You understand revenue is not guaranteed.</li></ul>${checkoutForm}</aside></div></section>`,
   });
 }
 
@@ -354,6 +383,7 @@ function dashboardPage(req, { plan, used, remaining, kits, message = '', error =
     <section class="section dashboard-section"><div class="container dashboard-grid">
       <aside class="stack">
         <div class="card usage-card"><h2>${e(plan.name)}</h2><p>${e(req.user.subscriptionStatus || 'free')} subscription · ${e(provider)} mode</p><div class="usage-bar"><span style="width:${progress}%"></span></div><p><strong>${used}</strong> used · <strong>${remaining}</strong> remaining this month</p><a class="text-link" href="/pricing">View plan limits →</a></div>
+        <div class="card"><p class="eyebrow">Money-first next step</p><h2>${e(pilotOffer.name)}</h2><p>${e(pilotOffer.description)}</p><form method="post" action="/billing/checkout-pilot">${csrf(req)}<button class="btn btn-secondary" type="submit">Buy ${money(pilotOffer.price)} sprint</button></form><a class="text-link" href="/pilot">Review offer →</a></div>
         <div class="card"><h2>Recent kits</h2>${kits.length ? `<ul class="kit-list">${kits.map((kit) => `<li><a href="/dashboard/kits/${kit.id}">${e(kit.name)}</a><span>${formatDate(kit.created_at)}</span></li>`).join('')}</ul>` : '<p>No kits yet. Generate the first one now.</p>'}</div>
       </aside>
       <div class="stack">
@@ -430,6 +460,7 @@ function billingPage(req, { message = '', error = '' } = {}) {
     content: `<section class="dashboard-hero"><div class="container"><p class="eyebrow">Billing</p><h1>Manage subscription</h1><p>Current plan: <strong>${e(plan.name)}</strong> · status: <strong>${e(req.user.subscriptionStatus)}</strong></p>${flashHtml(message, 'success')}${flashHtml(error, 'error')}</div></section>
     <section class="section"><div class="container stack">
       ${pricingCards(req, 'billing')}
+      <div class="card billing-actions"><div><h2>${e(pilotOffer.name)}</h2><p>${e(pilotOffer.description)}</p></div><form method="post" action="/billing/checkout-pilot">${csrf(req)}<button class="btn" type="submit">Buy ${money(pilotOffer.price)} sprint</button></form></div>
       <div class="card billing-actions"><h2>Customer Portal</h2><p>Use Stripe Customer Portal to upgrade, downgrade, cancel, update payment method, and download invoices.</p><form method="post" action="/billing/portal">${csrf(req)}<button class="btn btn-secondary" type="submit">Open customer portal</button></form></div>
     </div></section>`,
   });
@@ -445,7 +476,7 @@ function supportPage(req, { tickets = [], message = '', error = '' } = {}) {
   });
 }
 
-function adminPage(req, { metrics, users, tickets, events, message = '' }) {
+function adminPage(req, { metrics, users, tickets, events, pilotRequests = [], orders = [], message = '' }) {
   return renderPage(req, {
     title: 'Admin',
     active: '/admin',
@@ -453,11 +484,16 @@ function adminPage(req, { metrics, users, tickets, events, message = '' }) {
     content: `<section class="dashboard-hero"><div class="container"><p class="eyebrow">Admin</p><h1>Operating cockpit</h1><p>Monitor activation, usage, support, and subscription readiness.</p>${flashHtml(message, 'success')}</div></section>
     <section class="section"><div class="container stack">
       <div class="metric-grid">
-        ${metric('Users', metrics.users)}${metric('Paid users', metrics.paidUsers)}${metric('Visits today', metrics.visitsToday)}${metric('Kits today', metrics.kitsToday)}${metric('Launch kits', metrics.launchKits)}${metric('Open tickets', metrics.openTickets)}
+        ${metric('Users', metrics.users)}${metric('Paid users', metrics.paidUsers)}${metric('Revenue', money((metrics.paidRevenueCents || 0) / 100))}${metric('Paid orders', metrics.paidOrders)}${metric('Pilot leads', metrics.pilotRequests)}${metric('New pilot leads', metrics.newPilotRequests)}${metric('Visits today', metrics.visitsToday)}${metric('Kits today', metrics.kitsToday)}${metric('Launch kits', metrics.launchKits)}${metric('Open tickets', metrics.openTickets)}
       </div>
+      <div class="admin-actions"><a class="btn btn-secondary" href="/admin/pilot-requests.csv">Export pilot leads</a><a class="btn btn-secondary" href="/admin/contacts.csv">Export contacts</a></div>
       <div class="admin-grid">
         <div class="card table-card"><h2>Latest users</h2>${table(['Name','Email','Plan','Role','Created'], users.map((u) => [u.name, u.email, `${u.plan} / ${u.subscription_status}`, u.role, formatDate(u.created_at)]))}</div>
         <div class="card table-card"><h2>Open support</h2>${tickets.length ? tickets.map((ticket) => `<form class="ticket-admin" method="post" action="/admin/tickets/${ticket.id}/status">${csrf(req)}<div><strong>${e(ticket.subject)}</strong><p>${e(ticket.message)}</p><span>${e(ticket.email)} · ${formatDate(ticket.created_at)}</span></div><select name="status"><option ${ticket.status === 'open' ? 'selected' : ''}>open</option><option ${ticket.status === 'waiting' ? 'selected' : ''}>waiting</option><option ${ticket.status === 'closed' ? 'selected' : ''}>closed</option></select><button class="btn btn-small" type="submit">Update</button></form>`).join('') : '<p>No open tickets.</p>'}</div>
+      </div>
+      <div class="admin-grid">
+        <div class="card table-card"><h2>Pilot requests</h2>${pilotRequests.length ? pilotRequests.map((lead) => `<form class="ticket-admin" method="post" action="/admin/pilot-requests/${lead.id}/status">${csrf(req)}<div><strong>${e(lead.name)} · ${e(lead.company || 'No company')}</strong><p>${e(lead.offer)}</p><span>${e(lead.email)} · ${e(lead.urgency)} · ${e(lead.budget)} · ${formatDate(lead.created_at)}</span></div><select name="status"><option ${lead.status === 'new' ? 'selected' : ''}>new</option><option ${lead.status === 'contacted' ? 'selected' : ''}>contacted</option><option ${lead.status === 'qualified' ? 'selected' : ''}>qualified</option><option ${lead.status === 'won' ? 'selected' : ''}>won</option><option ${lead.status === 'lost' ? 'selected' : ''}>lost</option></select><button class="btn btn-small" type="submit">Update</button></form>`).join('') : '<p>No pilot requests yet.</p>'}</div>
+        <div class="card table-card"><h2>Paid sprint orders</h2>${table(['Email','Product','Amount','Status','Time'], orders.map((order) => [order.email, order.product_key, money(order.amount / 100), order.status, formatDate(order.created_at)]))}</div>
       </div>
       <div class="card table-card"><h2>Latest analytics events</h2>${table(['Event','Path','User','Time'], events.map((event) => [event.event_name, event.path || '—', event.user_id || 'anonymous', formatDate(event.created_at)]))}</div>
     </div></section>`,
@@ -474,13 +510,13 @@ function table(headers, rows) {
 }
 
 function stripeConfigPage(req, { planKey }) {
-  const plan = getPlan(planKey);
+  const plan = planKey === 'pilot' ? pilotOffer : getPlan(planKey);
   return renderPage(req, {
     title: 'Stripe setup required',
     active: '/pricing',
     footerCta: false,
     content: `<section class="page-hero"><div class="container"><p class="eyebrow">Manual setup required</p><h1>Stripe is technically implemented. Add keys to accept real payments.</h1><p>You selected <strong>${e(plan.name)}</strong>. Checkout cannot redirect until the one-time Stripe configuration is complete.</p></div></section>
-    <section class="section"><div class="container form-layout"><div class="card"><h2>One-time manual step</h2><ol><li>Create or open your Stripe account.</li><li>Run <code>npm run stripe:setup</code> locally after setting <code>STRIPE_SECRET_KEY</code>.</li><li>Copy the generated price IDs into <code>STRIPE_PRICE_STARTER</code>, <code>STRIPE_PRICE_PRO</code>, and <code>STRIPE_PRICE_BUSINESS</code>.</li><li>Create a webhook endpoint for <code>/webhooks/stripe</code> and set <code>STRIPE_WEBHOOK_SECRET</code>.</li><li>Restart the app and click checkout again.</li></ol><p>No fake payment or bypass has been performed.</p></div><div class="card"><h2>Test mode checklist</h2><ul><li>Use Stripe test keys first.</li><li>Complete Checkout with Stripe test cards.</li><li>Verify webhook updates the user plan.</li><li>Use Customer Portal for upgrade, downgrade, and cancellation.</li></ul><a class="btn btn-secondary" href="/billing">Back to billing</a></div></div></section>`,
+    <section class="section"><div class="container form-layout"><div class="card"><h2>One-time manual step</h2><ol><li>Create or open your Stripe account.</li><li>Run <code>npm run stripe:setup</code> locally after setting <code>STRIPE_SECRET_KEY</code>.</li><li>Copy the generated price IDs into <code>STRIPE_PRICE_STARTER</code>, <code>STRIPE_PRICE_PRO</code>, <code>STRIPE_PRICE_BUSINESS</code>, and <code>STRIPE_PRICE_PILOT</code>.</li><li>Create a webhook endpoint for <code>/webhooks/stripe</code> and set <code>STRIPE_WEBHOOK_SECRET</code>.</li><li>Restart the app and click checkout again.</li></ol><p>No fake payment or bypass has been performed.</p></div><div class="card"><h2>Test mode checklist</h2><ul><li>Use Stripe test keys first.</li><li>Complete Checkout with Stripe test cards.</li><li>Verify webhook updates the user plan.</li><li>Use Customer Portal for upgrade, downgrade, and cancellation.</li></ul><a class="btn btn-secondary" href="/billing">Back to billing</a></div></div></section>`,
   });
 }
 
@@ -500,6 +536,7 @@ module.exports = {
   heroPage,
   featuresPage,
   pricingPage,
+  pilotPage,
   useCasesPage,
   faqPage,
   contactPage,

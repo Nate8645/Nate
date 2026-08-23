@@ -14,7 +14,7 @@ UltraLaunch AI is not positioned as a generic copy generator. It is an **AI laun
 2. **Starter** — $19/month for founders validating one or two offers.
 3. **Pro** — $49/month for agencies/operators running multiple launch kits.
 4. **Business** — $149/month for teams with higher usage and priority support.
-5. **Guided pilot** — $99–$299 one-time implementation sprint to close the first paid customer faster.
+5. **Guided pilot** — $199 one-time implementation sprint to close the first paid customer faster.
 
 ## Discovery script
 
@@ -49,7 +49,7 @@ Thanks for taking the time. I want to understand whether UltraLaunch AI can help
 ```text
 Based on what you told me, the highest leverage next step is not more product work. It is a sharper paid pilot and a first outreach batch.
 
-I can refine this into a complete launch kit and help you send the first 25 targeted messages. The guided pilot is $99–$299, and if you continue with UltraLaunch AI I credit that toward the subscription.
+I can refine this into a complete launch kit and help you send the first 25 targeted messages. The guided pilot is $199, and if you continue with UltraLaunch AI I credit that toward the subscription.
 
 Do you want to start with the pilot today?
 ```

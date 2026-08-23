@@ -2,7 +2,7 @@
 
 const Stripe = require('stripe');
 const { one, run, nowIso } = require('./db');
-const { getPlan, stripePriceIdForPlan, planFromStripePrice } = require('./plans');
+const { getPlan, pilotOffer, stripePriceIdForPlan, stripePriceIdForPilot, planFromStripePrice } = require('./plans');
 
 function stripeClient() {
   if (!process.env.STRIPE_SECRET_KEY) return null;
@@ -51,10 +51,40 @@ async function createCheckoutSession(db, req, planKey) {
     success_url: `${base}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${base}/billing/cancel`,
     client_reference_id: String(req.user.id),
-    metadata: { userId: String(req.user.id), plan: plan.key },
+    metadata: { userId: String(req.user.id), plan: plan.key, kind: 'subscription' },
     subscription_data: { metadata: { userId: String(req.user.id), plan: plan.key } },
   });
   return { configured: true, url: session.url, id: session.id, plan };
+}
+
+async function createPilotCheckoutSession(db, req) {
+  if (!process.env.STRIPE_SECRET_KEY || !stripePriceIdForPilot()) return { configured: false, offer: pilotOffer };
+  const stripe = stripeClient();
+  const customerId = await ensureStripeCustomer(db, stripe, req.user);
+  const base = appUrl(req);
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer: customerId,
+    line_items: [{ price: stripePriceIdForPilot(), quantity: 1 }],
+    allow_promotion_codes: true,
+    success_url: `${base}/billing/success?session_id={CHECKOUT_SESSION_ID}&kind=pilot`,
+    cancel_url: `${base}/pilot?error=${encodeURIComponent('Checkout was canceled. No payment was made.')}`,
+    client_reference_id: String(req.user.id),
+    metadata: { userId: String(req.user.id), product: pilotOffer.key, kind: 'pilot' },
+  });
+  run(db, `INSERT INTO orders (user_id, email, product_key, amount, currency, stripe_checkout_session_id, status, metadata, created_at, updated_at)
+           VALUES (:userId, :email, :productKey, :amount, 'usd', :sessionId, 'pending', :metadata, :createdAt, :updatedAt)
+           ON CONFLICT(stripe_checkout_session_id) DO NOTHING`, {
+    userId: req.user.id,
+    email: req.user.email,
+    productKey: pilotOffer.key,
+    amount: pilotOffer.price * 100,
+    sessionId: session.id,
+    metadata: JSON.stringify({ kind: 'pilot' }),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+  return { configured: true, url: session.url, id: session.id, offer: pilotOffer };
 }
 
 async function createPortalSession(db, req) {
@@ -70,6 +100,12 @@ async function createPortalSession(db, req) {
 }
 
 async function syncCheckoutSession(db, session) {
+  const kind = session.metadata?.kind || (session.mode === 'payment' ? 'pilot' : 'subscription');
+  if (kind === 'pilot' || session.mode === 'payment') {
+    recordPilotOrder(db, session);
+    return;
+  }
+
   const userId = Number(session.metadata?.userId || session.client_reference_id || 0);
   if (!userId) return;
   let planKey = session.metadata?.plan || null;
@@ -95,6 +131,43 @@ async function syncCheckoutSession(db, session) {
     status,
     updatedAt: nowIso(),
     userId,
+  });
+}
+
+function recordPilotOrder(db, session) {
+  const userId = Number(session.metadata?.userId || session.client_reference_id || 0) || null;
+  const email = session.customer_details?.email || session.customer_email || session.metadata?.email || 'unknown@example.com';
+  const amount = Number(session.amount_total || pilotOffer.price * 100);
+  const currency = session.currency || 'usd';
+  const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || null;
+  const status = session.payment_status === 'paid' || session.status === 'complete' ? 'paid' : (session.payment_status || 'pending');
+  const existing = one(db, 'SELECT id FROM orders WHERE stripe_checkout_session_id = :sessionId', { sessionId: session.id });
+  if (existing) {
+    run(db, `UPDATE orders SET status = :status, stripe_payment_intent_id = :paymentIntentId, amount = :amount, currency = :currency,
+             metadata = :metadata, updated_at = :updatedAt WHERE stripe_checkout_session_id = :sessionId`, {
+      status,
+      paymentIntentId,
+      amount,
+      currency,
+      metadata: JSON.stringify(session.metadata || {}),
+      updatedAt: nowIso(),
+      sessionId: session.id,
+    });
+    return;
+  }
+  run(db, `INSERT INTO orders (user_id, email, product_key, amount, currency, stripe_checkout_session_id, stripe_payment_intent_id, status, metadata, created_at, updated_at)
+           VALUES (:userId, :email, :productKey, :amount, :currency, :sessionId, :paymentIntentId, :status, :metadata, :createdAt, :updatedAt)`, {
+    userId,
+    email,
+    productKey: pilotOffer.key,
+    amount,
+    currency,
+    sessionId: session.id,
+    paymentIntentId,
+    status,
+    metadata: JSON.stringify(session.metadata || {}),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
   });
 }
 
@@ -201,6 +274,7 @@ module.exports = {
   stripeClient,
   billingConfigured,
   createCheckoutSession,
+  createPilotCheckoutSession,
   createPortalSession,
   stripeWebhookHandler,
   syncCheckoutSession,

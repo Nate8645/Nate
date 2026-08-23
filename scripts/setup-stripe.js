@@ -2,7 +2,32 @@
 
 require('dotenv').config();
 const Stripe = require('stripe');
-const { paidPlans } = require('../src/plans');
+const { paidPlans, pilotOffer } = require('../src/plans');
+
+async function ensurePrice(stripe, { name, description, lookupKey, unitAmount, recurring = null, metadata }) {
+  const existing = await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 });
+  if (existing.data.length) {
+    const price = existing.data[0];
+    console.log(`${name}: existing price=${price.id}`);
+    return price.id;
+  }
+
+  const product = await stripe.products.create({
+    name,
+    description,
+    metadata,
+  });
+  const price = await stripe.prices.create({
+    product: product.id,
+    unit_amount: unitAmount,
+    currency: 'usd',
+    ...(recurring ? { recurring } : {}),
+    lookup_key: lookupKey,
+    metadata,
+  });
+  console.log(`${name}: product=${product.id} price=${price.id}`);
+  return price.id;
+}
 
 async function main() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -11,26 +36,27 @@ async function main() {
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
-  console.log('Creating Stripe products/prices for UltraLaunch AI...');
+  console.log('Creating or reusing Stripe products/prices for UltraLaunch AI...');
   const outputs = {};
 
   for (const plan of paidPlans()) {
-    const product = await stripe.products.create({
+    outputs[plan.stripeEnv] = await ensurePrice(stripe, {
       name: `UltraLaunch AI ${plan.name}`,
       description: plan.description,
-      metadata: { app: 'ultralaunch-ai', plan: plan.key },
-    });
-    const price = await stripe.prices.create({
-      product: product.id,
-      unit_amount: plan.price * 100,
-      currency: 'usd',
+      lookupKey: `ultralaunch_${plan.key}_monthly`,
+      unitAmount: plan.price * 100,
       recurring: { interval: 'month' },
-      lookup_key: `ultralaunch_${plan.key}_monthly`,
       metadata: { app: 'ultralaunch-ai', plan: plan.key, kitLimit: String(plan.kitLimit) },
     });
-    outputs[plan.stripeEnv] = price.id;
-    console.log(`${plan.name}: product=${product.id} price=${price.id}`);
   }
+
+  outputs[pilotOffer.stripeEnv] = await ensurePrice(stripe, {
+    name: `UltraLaunch AI ${pilotOffer.name}`,
+    description: pilotOffer.description,
+    lookupKey: 'ultralaunch_pilot_onetime',
+    unitAmount: pilotOffer.price * 100,
+    metadata: { app: 'ultralaunch-ai', product: pilotOffer.key },
+  });
 
   console.log('\nCopy these values into your .env or deployment environment:');
   for (const [key, value] of Object.entries(outputs)) {

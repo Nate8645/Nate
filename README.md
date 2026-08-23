@@ -6,6 +6,7 @@ It includes:
 
 - Professional responsive marketing website
 - Pricing pages with Free, Starter, Pro, and Business tiers
+- $199 Concierge Launch Sprint checkout/request funnel for the fastest first-revenue path
 - User registration, login, secure sessions, and user accounts
 - Dashboard with AI launch-kit generation
 - SQLite database persistence
@@ -62,6 +63,7 @@ No Stripe secrets are committed. To accept real payments:
    STRIPE_PRICE_STARTER=price_...
    STRIPE_PRICE_PRO=price_...
    STRIPE_PRICE_BUSINESS=price_...
+   STRIPE_PRICE_PILOT=price_...
    ```
 5. Create a Stripe webhook endpoint:
    ```text
@@ -104,6 +106,8 @@ See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for a production checklist.
 - [`go-to-market/customer-acquisition.md`](./go-to-market/customer-acquisition.md)
 - [`go-to-market/content-pack.md`](./go-to-market/content-pack.md)
 - [`go-to-market/sales-playbook.md`](./go-to-market/sales-playbook.md)
+- [`go-to-market/revenue-sprint-assets.md`](./go-to-market/revenue-sprint-assets.md)
+- [`go-to-market/lead-sources.csv`](./go-to-market/lead-sources.csv)
 
 ## Original plugin
 

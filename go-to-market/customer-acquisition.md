@@ -10,7 +10,7 @@ Traits:
 
 - Sells services, SaaS, templates, or ecommerce improvements.
 - Needs speed more than perfect customization.
-- Can pay $19–$149/month or $99–$299 for a guided pilot.
+- Can pay $19–$149/month or $199 for a guided pilot.
 - Has authority to buy without procurement.
 - Active on LinkedIn, X/Twitter, Indie Hackers, Product Hunt, founder communities, or Shopify/ecommerce communities.
 
@@ -102,7 +102,7 @@ I noticed {{specific_trigger}} and thought {{company}} might be testing a new of
 
 I built UltraLaunch AI, a launch workspace that generates the ICP, positioning, pricing, landing-page copy, email/DM scripts, short-form content, SEO briefs, objections, and 24-hour execution plan from one brief.
 
-If you send one current offer, I can generate a sample kit and review it with you in 15 minutes. If it is useful, the guided pilot is $99–$299 and can be credited toward a subscription.
+If you send one current offer, I can generate a sample kit and review it with you in 15 minutes. If it is useful, the guided pilot is $199 and can be credited toward a subscription.
 
 Worth a look this week?
 
@@ -137,14 +137,14 @@ If useful, I can send a free example launch kit structure you can reuse internal
    - objections
 4. Ask: "Which part would you actually use today?"
 5. Offer paid pilot:
-   - "I can refine this into a complete kit and help you send the first 25 messages. Pilot is $99–$299. Want to do it?"
+   - "I can refine this into a complete kit and help you send the first 25 messages. Pilot is $199. Want to do it?"
 
 ## First customer offer
 
 Use a services-assisted SaaS sale for speed:
 
 - Free generated kit
-- $99–$299 guided implementation pilot
+- $199 guided implementation pilot
 - Subscription upsell after pilot
 - Credit pilot fee toward subscription if they continue
 

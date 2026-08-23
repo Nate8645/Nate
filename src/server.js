@@ -8,7 +8,7 @@ const { openDatabase, one, all, run, nowIso, insertUsage, insertAnalytics, month
 const { createUser, createSession, destroySession, loadUser, csrfMiddleware, requireAuth, requireAdmin, normalizeEmail, verifyPassword, clientIp, sha256 } = require('./auth');
 const { getPlan, plans } = require('./plans');
 const { activeAiProvider, generateLaunchKit } = require('./ai');
-const { stripeClient, createCheckoutSession, createPortalSession, stripeWebhookHandler, syncCheckoutSession } = require('./stripe');
+const { stripeClient, createCheckoutSession, createPilotCheckoutSession, createPortalSession, stripeWebhookHandler, syncCheckoutSession } = require('./stripe');
 const views = require('./views');
 
 function createApp(options = {}) {
@@ -31,6 +31,36 @@ function createApp(options = {}) {
   app.get('/', (req, res) => res.send(views.heroPage(req)));
   app.get('/features', (req, res) => res.send(views.featuresPage(req)));
   app.get('/pricing', (req, res) => res.send(views.pricingPage(req, req.query.message || '')));
+  app.get('/pilot', (req, res) => res.send(views.pilotPage(req, { message: req.query.message || '', error: req.query.error || '' })));
+  app.post('/pilot/request', rateLimit({ windowMs: 15 * 60 * 1000, max: 6, prefix: 'pilot-request' }), (req, res) => {
+    try {
+      const name = safeText(req.body.name, 80);
+      const email = normalizeEmail(req.body.email);
+      const company = safeText(req.body.company, 120, false);
+      const website = safeText(req.body.website, 200, false);
+      const offer = safeText(req.body.offer, 1200);
+      const urgency = safeChoice(req.body.urgency, ['Need first customer this week', 'Launching in 30 days', 'Testing positioning', 'Agency/client workflow'], 'Need first customer this week');
+      const budget = safeChoice(req.body.budget, ['Ready for $199 sprint', 'Need free kit first', 'Considering subscription only', 'Not sure yet'], 'Not sure yet');
+      if (!name || !isEmail(email) || !offer) throw new Error('Name, valid email, and offer are required.');
+      run(db, `INSERT INTO pilot_requests (user_id, name, email, company, website, offer, urgency, budget, status, created_at, updated_at)
+               VALUES (:userId, :name, :email, :company, :website, :offer, :urgency, :budget, 'new', :createdAt, :updatedAt)`, {
+        userId: req.user?.id || null,
+        name,
+        email,
+        company,
+        website,
+        offer,
+        urgency,
+        budget,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+      insertAnalytics(db, eventContext(req, 'pilot_request_submitted', { budget, urgency }));
+      res.redirect('/pilot?message=Pilot%20request%20received.%20We%20will%20follow%20up%20with%20next%20steps.');
+    } catch (error) {
+      res.status(400).send(views.pilotPage(req, { error: error.message }));
+    }
+  });
   app.get('/use-cases', (req, res) => res.send(views.useCasesPage(req)));
   app.get('/faq', (req, res) => res.send(views.faqPage(req)));
 
@@ -202,6 +232,17 @@ function createApp(options = {}) {
     }
   });
 
+  app.post('/billing/checkout-pilot', requireAuth, rateLimit({ windowMs: 10 * 60 * 1000, max: 12, prefix: 'pilot-checkout' }), async (req, res, next) => {
+    try {
+      const session = await createPilotCheckoutSession(db, req);
+      if (!session.configured) return res.status(412).send(views.stripeConfigPage(req, { planKey: 'pilot' }));
+      insertAnalytics(db, eventContext(req, 'stripe_pilot_checkout_started', { sessionId: session.id }));
+      res.redirect(303, session.url);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/billing/portal', requireAuth, rateLimit({ windowMs: 10 * 60 * 1000, max: 12, prefix: 'portal' }), async (req, res, next) => {
     try {
       const session = await createPortalSession(db, req);
@@ -224,7 +265,10 @@ function createApp(options = {}) {
           await syncCheckoutSession(db, session);
         }
       }
-      res.send(views.billingPage(refreshReqUser(req, db), { message: 'Payment flow completed. Subscription status is updated by Stripe webhooks.' }));
+      const message = req.query.kind === 'pilot'
+        ? 'Payment flow completed. Your Concierge Launch Sprint order is recorded after Stripe webhook confirmation.'
+        : 'Payment flow completed. Subscription status is updated by Stripe webhooks.';
+      res.send(views.billingPage(refreshReqUser(req, db), { message }));
     } catch (error) {
       next(error);
     }
@@ -248,6 +292,26 @@ function createApp(options = {}) {
     res.redirect('/admin?message=Ticket%20updated');
   });
 
+  app.post('/admin/pilot-requests/:id/status', requireAdmin, (req, res) => {
+    const status = safeChoice(req.body.status, ['new', 'contacted', 'qualified', 'won', 'lost'], 'new');
+    run(db, 'UPDATE pilot_requests SET status = :status, updated_at = :updatedAt WHERE id = :id', {
+      status,
+      updatedAt: nowIso(),
+      id: Number(req.params.id),
+    });
+    res.redirect('/admin?message=Pilot%20lead%20updated');
+  });
+
+  app.get('/admin/pilot-requests.csv', requireAdmin, (req, res) => {
+    const rows = all(db, 'SELECT id, name, email, company, website, offer, urgency, budget, status, created_at FROM pilot_requests ORDER BY created_at DESC');
+    sendCsv(res, 'pilot-requests.csv', ['id', 'name', 'email', 'company', 'website', 'offer', 'urgency', 'budget', 'status', 'created_at'], rows);
+  });
+
+  app.get('/admin/contacts.csv', requireAdmin, (req, res) => {
+    const rows = all(db, 'SELECT id, name, email, company, message, created_at FROM contacts ORDER BY created_at DESC');
+    sendCsv(res, 'contacts.csv', ['id', 'name', 'email', 'company', 'message', 'created_at'], rows);
+  });
+
   app.get('/api/me', requireAuth, (req, res) => {
     res.json({ user: req.user, plan: getPlan(req.user.plan), aiProvider: activeAiProvider() });
   });
@@ -260,7 +324,7 @@ function createApp(options = {}) {
 
   app.get('/sitemap.xml', (req, res) => {
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-    const paths = ['/', '/features', '/pricing', '/use-cases', '/faq', '/contact', '/login', '/register'];
+    const paths = ['/', '/features', '/pricing', '/pilot', '/use-cases', '/faq', '/contact', '/login', '/register'];
     res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${paths.map((p) => `<url><loc>${base}${p}</loc></url>`).join('')}</urlset>`);
   });
 
@@ -304,8 +368,10 @@ function adminView(req, db, message = '') {
   const metrics = dashboardMetrics(db);
   const users = all(db, 'SELECT id, name, email, role, plan, subscription_status, created_at FROM users ORDER BY created_at DESC LIMIT 20');
   const tickets = all(db, `SELECT * FROM support_tickets WHERE status != 'closed' ORDER BY created_at DESC LIMIT 20`);
+  const pilotRequests = all(db, `SELECT * FROM pilot_requests WHERE status != 'lost' ORDER BY created_at DESC LIMIT 20`);
+  const orders = all(db, `SELECT * FROM orders ORDER BY created_at DESC LIMIT 20`);
   const events = all(db, 'SELECT * FROM analytics_events ORDER BY created_at DESC LIMIT 30');
-  return views.adminPage(req, { metrics, users, tickets, events, message });
+  return views.adminPage(req, { metrics, users, tickets, pilotRequests, orders, events, message });
 }
 
 function refreshReqUser(req, db) {
@@ -418,6 +484,17 @@ function safeReturnTo(value, fallback = '/dashboard') {
   const text = String(value || '');
   if (text.startsWith('/') && !text.startsWith('//') && !text.includes('://')) return text;
   return fallback;
+}
+
+function sendCsv(res, filename, headers, rows) {
+  const escapeCell = (value) => {
+    const text = String(value ?? '');
+    return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  };
+  const csv = [headers.join(','), ...rows.map((row) => headers.map((header) => escapeCell(row[header])).join(','))].join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csv + '\n');
 }
 
 if (require.main === module) {

@@ -124,6 +124,42 @@ function runMigrations(db) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS pilot_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      company TEXT,
+      website TEXT,
+      offer TEXT NOT NULL,
+      urgency TEXT NOT NULL,
+      budget TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pilot_requests_status ON pilot_requests(status);
+    CREATE INDEX IF NOT EXISTS idx_pilot_requests_created ON pilot_requests(created_at);
+
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      email TEXT NOT NULL,
+      product_key TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'usd',
+      stripe_checkout_session_id TEXT UNIQUE,
+      stripe_payment_intent_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      metadata TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_product_key ON orders(product_key);
+
     CREATE TABLE IF NOT EXISTS stripe_events (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -201,6 +237,10 @@ function dashboardMetrics(db) {
   return {
     users: Number(one(db, 'SELECT COUNT(*) AS n FROM users')?.n || 0),
     paidUsers: Number(one(db, `SELECT COUNT(*) AS n FROM users WHERE plan != 'free' AND subscription_status IN ('active','trialing','past_due')`)?.n || 0),
+    paidOrders: Number(one(db, `SELECT COUNT(*) AS n FROM orders WHERE status = 'paid'`)?.n || 0),
+    paidRevenueCents: Number(one(db, `SELECT COALESCE(SUM(amount), 0) AS n FROM orders WHERE status = 'paid'`)?.n || 0),
+    pilotRequests: Number(one(db, 'SELECT COUNT(*) AS n FROM pilot_requests')?.n || 0),
+    newPilotRequests: Number(one(db, `SELECT COUNT(*) AS n FROM pilot_requests WHERE status = 'new'`)?.n || 0),
     launchKits: Number(one(db, 'SELECT COUNT(*) AS n FROM launch_kits')?.n || 0),
     openTickets: Number(one(db, `SELECT COUNT(*) AS n FROM support_tickets WHERE status = 'open'`)?.n || 0),
     visitsToday: Number(one(db, `SELECT COUNT(*) AS n FROM analytics_events WHERE event_name = 'page_view' AND created_at >= :dayIso`, { dayIso })?.n || 0),

@@ -1,5 +1,22 @@
 'use strict';
 
+const pilotOffer = {
+  key: 'pilot',
+  name: 'Concierge Launch Sprint',
+  price: 199,
+  cadence: 'one-time',
+  stripeEnv: 'STRIPE_PRICE_PILOT',
+  description: 'Founder-led 24-hour launch sprint: refined kit, landing-page critique, and first 25 outreach messages prepared with you.',
+  cta: 'Buy launch sprint',
+  deliverables: [
+    '1 live or async launch-kit review',
+    'Landing-page hero and pricing refinement',
+    'First 25 personalized outreach messages prepared',
+    'Objection map and close script',
+    'Subscription credit recommendation after sprint',
+  ],
+};
+
 const plans = {
   free: {
     key: 'free',
@@ -92,6 +109,10 @@ function stripePriceIdForPlan(planKey) {
   return plan.stripeEnv ? process.env[plan.stripeEnv] : null;
 }
 
+function stripePriceIdForPilot() {
+  return process.env[pilotOffer.stripeEnv] || null;
+}
+
 function planFromStripePrice(priceId) {
   if (!priceId) return null;
   return paidPlans().find((plan) => process.env[plan.stripeEnv] === priceId)?.key || null;
@@ -99,9 +120,11 @@ function planFromStripePrice(priceId) {
 
 module.exports = {
   plans,
+  pilotOffer,
   getPlan,
   paidPlans,
   publicPlans,
   stripePriceIdForPlan,
+  stripePriceIdForPilot,
   planFromStripePrice,
 };

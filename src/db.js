@@ -248,6 +248,179 @@ function runMigrations(db) {
 
     CREATE INDEX IF NOT EXISTS idx_connected_accounts_user ON connected_accounts(user_id);
 
+    CREATE TABLE IF NOT EXISTS projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      metadata TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id, status);
+
+    CREATE TABLE IF NOT EXISTS knowledge_sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+      source_type TEXT NOT NULL,
+      name TEXT NOT NULL,
+      source_uri TEXT,
+      content TEXT,
+      status TEXT NOT NULL DEFAULT 'indexed',
+      metadata TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_knowledge_sources_user ON knowledge_sources(user_id, source_type);
+
+    CREATE TABLE IF NOT EXISTS ai_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_conversations_user ON ai_conversations(user_id, updated_at);
+
+    CREATE TABLE IF NOT EXISTS ai_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation ON ai_messages(conversation_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS orchestrator_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      conversation_id INTEGER REFERENCES ai_conversations(id) ON DELETE SET NULL,
+      user_goal TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'planned',
+      plan_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_orchestrator_runs_user ON orchestrator_runs(user_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS action_approvals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      run_id INTEGER REFERENCES orchestrator_runs(id) ON DELETE SET NULL,
+      task_id INTEGER REFERENCES agent_tasks(id) ON DELETE SET NULL,
+      agent_key TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      what TEXT NOT NULL,
+      why TEXT NOT NULL,
+      data_used TEXT NOT NULL,
+      tool TEXT NOT NULL,
+      expected_result TEXT NOT NULL,
+      risk_level TEXT NOT NULL DEFAULT 'medium',
+      permission_key TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_action_approvals_user ON action_approvals(user_id, status);
+
+    CREATE TABLE IF NOT EXISTS integration_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider_key TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'not_connected',
+      permissions_json TEXT NOT NULL DEFAULT '[]',
+      config_json TEXT,
+      last_checked_at TEXT,
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(user_id, provider_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_integration_connections_user ON integration_connections(user_id, provider_key);
+
+    CREATE TABLE IF NOT EXISTS agent_permission_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      agent_key TEXT NOT NULL,
+      permission_key TEXT NOT NULL,
+      decision TEXT NOT NULL DEFAULT 'ask',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(user_id, agent_key, permission_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agent_permission_rules_user ON agent_permission_rules(user_id, agent_key);
+
+    CREATE TABLE IF NOT EXISTS ai_employees (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      goals TEXT NOT NULL,
+      tools TEXT NOT NULL,
+      permissions TEXT NOT NULL,
+      schedule TEXT,
+      kpis TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_employees_user ON ai_employees(user_id, status);
+
+    CREATE TABLE IF NOT EXISTS scheduled_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      cadence TEXT NOT NULL,
+      agent_key TEXT NOT NULL,
+      action_text TEXT NOT NULL,
+      requires_approval INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'active',
+      last_run_at TEXT,
+      next_run_hint TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_user ON scheduled_jobs(user_id, status);
+
+    CREATE TABLE IF NOT EXISTS autopilot_signals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      signal_type TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'info',
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      recommended_action TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_autopilot_signals_user ON autopilot_signals(user_id, status);
+
+    CREATE TABLE IF NOT EXISTS security_settings (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      setting_key TEXT NOT NULL,
+      setting_value TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(user_id, setting_key)
+    );
+
     CREATE TABLE IF NOT EXISTS stripe_events (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -331,8 +504,12 @@ function dashboardMetrics(db) {
     newPilotRequests: Number(one(db, `SELECT COUNT(*) AS n FROM pilot_requests WHERE status = 'new'`)?.n || 0),
     launchKits: Number(one(db, 'SELECT COUNT(*) AS n FROM launch_kits')?.n || 0),
     aiActions: Number(one(db, 'SELECT COUNT(*) AS n FROM ai_action_logs')?.n || 0),
-    pendingApprovals: Number(one(db, `SELECT COUNT(*) AS n FROM agent_tasks WHERE status = 'queued' AND requires_approval = 1`)?.n || 0),
+    orchestratorRuns: Number(one(db, 'SELECT COUNT(*) AS n FROM orchestrator_runs')?.n || 0),
+    pendingApprovals: Number(one(db, `SELECT COUNT(*) AS n FROM action_approvals WHERE status = 'pending'`)?.n || 0)
+      + Number(one(db, `SELECT COUNT(*) AS n FROM agent_tasks WHERE status = 'queued' AND requires_approval = 1`)?.n || 0),
     automationRules: Number(one(db, 'SELECT COUNT(*) AS n FROM automation_rules WHERE is_enabled = 1')?.n || 0),
+    integrationsPrepared: Number(one(db, 'SELECT COUNT(*) AS n FROM integration_connections')?.n || 0),
+    knowledgeSources: Number(one(db, 'SELECT COUNT(*) AS n FROM knowledge_sources')?.n || 0),
     openTickets: Number(one(db, `SELECT COUNT(*) AS n FROM support_tickets WHERE status = 'open'`)?.n || 0),
     visitsToday: Number(one(db, `SELECT COUNT(*) AS n FROM analytics_events WHERE event_name = 'page_view' AND created_at >= :dayIso`, { dayIso })?.n || 0),
     signupsToday: Number(one(db, `SELECT COUNT(*) AS n FROM users WHERE created_at >= :dayIso`, { dayIso })?.n || 0),

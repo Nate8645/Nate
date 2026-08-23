@@ -121,6 +121,72 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.equal(res.status, 200);
     assert.match(automationsHtml, /Automation engine/);
 
+    res = await request('/command');
+    const commandHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(commandHtml, /AI Command Center/);
+    assert.match(commandHtml, /Orchestrate with AI/);
+    const commandCsrf = extractCsrf(commandHtml);
+
+    res = await request('/command/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: commandCsrf,
+        prompt: 'Optimiere meinen Shopify-Shop und erstelle eine Marketingkampagne',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.match(res.headers.get('location'), /^\/command\?message=/);
+
+    res = await request('/tasks');
+    const tasksHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(tasksHtml, /Agent work/);
+    assert.match(tasksHtml, /shopify-agent/);
+
+    res = await request('/integrations');
+    const integrationsHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(integrationsHtml, /MCP \/ Connector Marketplace/);
+    assert.match(integrationsHtml, /Shopify/);
+    const integrationCsrf = extractCsrf(integrationsHtml);
+
+    res = await request('/integrations/shopify/install', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ csrf_token: integrationCsrf, permissions: 'connected_accounts' }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/integrations?message=Integration%20prepared');
+
+    res = await request('/memory');
+    const memoryHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(memoryHtml, /AI Memory/);
+
+    res = await request('/files');
+    const filesHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(filesHtml, /Knowledge Base/);
+
+    res = await request('/security');
+    const securityHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(securityHtml, /Security \+ Trust/);
+    assert.match(securityHtml, /STOP all active AI actions/);
+
+    res = await request('/analytics');
+    const analyticsHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(analyticsHtml, /AI Analytics/);
+
+    res = await request('/marketplace');
+    const marketplaceHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(marketplaceHtml, /AI Agent Marketplace/);
+    assert.match(marketplaceHtml, /CEO Agent/);
+
     res = await request('/product');
     const productHtml = await res.text();
     assert.equal(res.status, 200);

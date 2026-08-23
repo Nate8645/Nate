@@ -11,6 +11,7 @@ const { activeAiProvider, buildFallbackKit, generateLaunchKit } = require('./ai'
 const { stripeClient, createCheckoutSession, createPilotCheckoutSession, createPortalSession, stripeWebhookHandler, syncCheckoutSession } = require('./stripe');
 const { launchReadiness } = require('./launch-readiness');
 const { ensureTrustDefaults, logAction, upsertMemory, userTrustSnapshot, agentWorkspace, createAgentTask, exportUserData, permissionCatalog } = require('./intelligence');
+const { commandCenterSnapshot, orchestrateCommand, integrationSnapshot, installIntegration, testIntegration, disconnectIntegration, projectsSnapshot, createProject, createKnowledgeSource, memorySnapshot, createMemory, securitySnapshot, setKillSwitch, decideApproval, analyticsSnapshot, marketplaceSnapshot, tasksSnapshot, createAiEmployee } = require('./platform');
 const views = require('./views');
 
 function createApp(options = {}) {
@@ -154,6 +155,139 @@ function createApp(options = {}) {
   app.get('/dashboard', requireAuth, (req, res) => {
     ensureTrustDefaults(db, req.user.id);
     res.send(renderDashboard(req, db, { message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.get('/command', requireAuth, (req, res) => {
+    res.send(views.commandCenterPage(req, { snapshot: commandCenterSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/command/chat', requireAuth, rateLimit({ windowMs: 15 * 60 * 1000, max: 16, prefix: 'command-chat' }), (req, res) => {
+    try {
+      const prompt = safeText(req.body.prompt, 1600);
+      const result = orchestrateCommand(db, { userId: req.user.id, prompt });
+      insertAnalytics(db, eventContext(req, 'command_orchestrated', { runId: result.runId, steps: result.createdTasks.length }));
+      res.redirect(`/command?message=${encodeURIComponent('AI plan created with tasks and approvals')}`);
+    } catch (error) {
+      res.redirect(`/command?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.get('/tasks', requireAuth, (req, res) => {
+    res.send(views.tasksPage(req, { snapshot: tasksSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/approvals/:id/decision', requireAuth, (req, res) => {
+    decideApproval(db, { userId: req.user.id, approvalId: req.params.id, decision: req.body.decision });
+    res.redirect(`${safeReturnTo(req.body.returnTo, '/security')}?message=Approval%20updated`);
+  });
+
+  app.get('/integrations', requireAuth, (req, res) => {
+    res.send(views.integrationsPage(req, { snapshot: integrationSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/integrations/:provider/install', requireAuth, (req, res) => {
+    try {
+      installIntegration(db, { userId: req.user.id, providerKey: safeText(req.params.provider, 80, false), permissions: Array.isArray(req.body.permissions) ? req.body.permissions : [req.body.permissions].filter(Boolean) });
+      res.redirect('/integrations?message=Integration%20prepared');
+    } catch (error) {
+      res.redirect(`/integrations?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.post('/integrations/:provider/test', requireAuth, (req, res) => {
+    try {
+      const message = testIntegration(db, { userId: req.user.id, providerKey: safeText(req.params.provider, 80, false) });
+      res.redirect(`/integrations?message=${encodeURIComponent(message)}`);
+    } catch (error) {
+      res.redirect(`/integrations?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.post('/integrations/:provider/disconnect', requireAuth, (req, res) => {
+    disconnectIntegration(db, { userId: req.user.id, providerKey: safeText(req.params.provider, 80, false) });
+    res.redirect('/integrations?message=Integration%20disabled');
+  });
+
+  app.get('/projects', requireAuth, (req, res) => {
+    res.send(views.projectsPage(req, { snapshot: projectsSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/projects', requireAuth, (req, res) => {
+    try {
+      createProject(db, { userId: req.user.id, name: safeText(req.body.name, 120), description: safeText(req.body.description, 800, false) });
+      res.redirect('/projects?message=Project%20created');
+    } catch (error) {
+      res.redirect(`/projects?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.get('/files', requireAuth, (req, res) => {
+    res.send(views.filesPage(req, { snapshot: projectsSnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/files/sources', requireAuth, rateLimit({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'knowledge-source' }), (req, res) => {
+    try {
+      createKnowledgeSource(db, {
+        userId: req.user.id,
+        projectId: req.body.projectId || null,
+        sourceType: safeChoice(req.body.sourceType, ['note', 'url', 'pdf', 'document', 'screenshot', 'database', 'cloud_storage'], 'note'),
+        name: safeText(req.body.name, 140),
+        sourceUri: safeText(req.body.sourceUri, 500, false),
+        content: safeText(req.body.content, 8000, false),
+      });
+      res.redirect('/files?message=Knowledge%20source%20indexed');
+    } catch (error) {
+      res.redirect(`/files?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.get('/memory', requireAuth, (req, res) => {
+    res.send(views.memoryPage(req, { snapshot: memorySnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/memory', requireAuth, (req, res) => {
+    try {
+      createMemory(db, { userId: req.user.id, memoryType: safeChoice(req.body.memoryType, ['short_term', 'long_term', 'project', 'customer', 'agent', 'conversation', 'task_history', 'preference', 'knowledge_base'], 'preference'), key: safeText(req.body.key, 80), value: safeText(req.body.value, 1200) });
+      res.redirect('/memory?message=Memory%20saved');
+    } catch (error) {
+      res.redirect(`/memory?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  app.get('/security', requireAuth, (req, res) => {
+    res.send(views.securityPage(req, { snapshot: securitySnapshot(db, req.user.id), message: req.query.message || '', error: req.query.error || '' }));
+  });
+
+  app.post('/security/kill-switch', requireAuth, (req, res) => {
+    setKillSwitch(db, { userId: req.user.id, state: req.body.state });
+    res.redirect('/security?message=Kill%20switch%20updated');
+  });
+
+  app.get('/analytics', requireAuth, (req, res) => {
+    res.send(views.analyticsPage(req, { snapshot: analyticsSnapshot(db, req.user.id) }));
+  });
+
+  app.get('/marketplace', requireAuth, (req, res) => {
+    res.send(views.marketplacePage(req, { snapshot: marketplaceSnapshot(db, req.user.id) }));
+  });
+
+  app.post('/employees', requireAuth, (req, res) => {
+    try {
+      const role = safeText(req.body.role, 240);
+      createAiEmployee(db, {
+        userId: req.user.id,
+        name: safeText(req.body.name, 120),
+        role,
+        goals: safeText(req.body.goals, 1200),
+        tools: ['Task queue', 'Knowledge base', 'Automation builder', 'Approval queue'],
+        permissions: ['read_data', 'ai_memory', 'workflow_automation'],
+        schedule: safeText(req.body.schedule, 300, false),
+        kpis: ['Tasks completed', 'Approvals cleared', 'Business impact'],
+      });
+      res.redirect('/agents?message=AI%20employee%20created');
+    } catch (error) {
+      res.redirect(`/agents?error=${encodeURIComponent(error.message)}`);
+    }
   });
 
   app.get('/agents', requireAuth, (req, res) => {

@@ -696,3 +696,25 @@ body::before {
 .permission-card select { min-width: 0; }
 @media (max-width: 1200px) { .agent-grid { grid-template-columns: repeat(2, minmax(220px,1fr)); } }
 @media (max-width: 760px) { .agent-grid, .trust-grid, .mini-link-grid { grid-template-columns: 1fr; } .permission-card form { flex-direction: column; align-items: stretch; } }
+
+/* AI Operating System expansion */
+.command-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; background: rgba(255,255,255,.055); }
+.command-nav a { text-decoration: none; color: var(--muted); border: 1px solid rgba(255,255,255,.11); border-radius: 999px; padding: 8px 12px; font-weight: 850; font-size: .9rem; background: rgba(255,255,255,.045); }
+.command-nav a.active, .command-nav a:hover { color: #071015; background: #91fff0; border-color: #91fff0; }
+.command-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 18px; align-items: start; }
+.command-chat textarea { min-height: 180px; font-size: 1rem; }
+.metric-grid.mini { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.run-card, .approval-card, .integration-card { display: grid; gap: 8px; padding: 18px; border: 1px solid rgba(255,255,255,.12); border-radius: 20px; background: rgba(255,255,255,.055); margin-bottom: 10px; }
+.run-card span, .approval-card small { color: var(--muted); }
+.approval-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-color: rgba(255,209,102,.25); }
+.integration-grid { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 16px; }
+.integration-card h2 { margin-top: 8px; font-size: 1.35rem; }
+.marketplace-grid { grid-template-columns: repeat(4, minmax(230px, 1fr)); }
+@media (max-width: 1120px) { .command-grid, .integration-grid { grid-template-columns: 1fr; } .marketplace-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
+@media (max-width: 760px) { .approval-card { grid-template-columns: 1fr; } .command-nav { max-height: 180px; overflow: auto; } .marketplace-grid { grid-template-columns: 1fr; } }
+.automation-flow { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; padding: 18px; border-radius: 24px; border: 1px solid rgba(145,255,240,.22); background: rgba(145,255,240,.075); }
+.automation-flow span { padding: 10px 14px; border-radius: 999px; background: rgba(7,9,20,.58); border: 1px solid rgba(255,255,255,.14); color: #91fff0; font-weight: 950; letter-spacing: .08em; font-size: .82rem; }
+.automation-flow em { color: var(--gold); font-style: normal; font-weight: 950; }
+.permission-picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.permission-picker label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.11); color: var(--muted); font-size: .78rem; font-weight: 800; }
+.install-form { display: grid; gap: 8px; }

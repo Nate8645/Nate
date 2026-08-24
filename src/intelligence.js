@@ -256,17 +256,20 @@ function trustDataUsage(db, userId) {
   ];
 }
 
-function envStatus(key) {
-  return process.env[key] ? 'configured' : 'not configured';
+function envGroupStatus(keys) {
+  const configured = keys.filter((key) => Boolean(process.env[key])).length;
+  if (configured === 0) return 'not configured';
+  if (configured === keys.length) return 'configured';
+  return `partial (${configured}/${keys.length})`;
 }
 
 function trustApiAccess() {
   return [
     { area: 'AI provider', status: process.env.OPENAI_API_KEY ? 'external provider configured' : 'offline engine active', detail: process.env.OPENAI_API_KEY ? 'Prompts needed for generation can be sent to the configured OpenAI-compatible endpoint.' : 'Launch kits use deterministic local generation; no external LLM key is required for local demos.' },
-    { area: 'Stripe billing', status: process.env.STRIPE_SECRET_KEY ? 'secret configured' : 'not configured', detail: 'Checkout/webhooks are implemented, but live payments require Stripe secrets and price IDs.' },
-    { area: 'GitHub connector', status: envStatus('GITHUB_CLIENT_ID'), detail: 'Future OAuth/App integration only. No repo write actions are live without official credentials and approval.' },
-    { area: 'Shopify connector', status: envStatus('SHOPIFY_CLIENT_ID'), detail: 'Future store integration only. No store data is accessed until OAuth credentials and scopes are configured.' },
-    { area: 'Google connector', status: envStatus('GOOGLE_CLIENT_ID'), detail: 'Future Drive/Gmail/Calendar access only through OAuth scopes and approval gates.' },
+    { area: 'Stripe billing', status: envGroupStatus(['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_STARTER', 'STRIPE_PRICE_PRO', 'STRIPE_PRICE_BUSINESS', 'STRIPE_PRICE_PILOT']), detail: 'Checkout/webhooks are implemented, but live payments require Stripe secret, webhook secret, and all price IDs.' },
+    { area: 'GitHub connector', status: envGroupStatus(['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_WEBHOOK_SECRET']), detail: 'Future OAuth/App integration only. No repo write actions are live without official credentials and approval.' },
+    { area: 'Shopify connector', status: envGroupStatus(['SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET']), detail: 'Future store integration only. No store data is accessed until OAuth credentials and scopes are configured.' },
+    { area: 'Google connector', status: envGroupStatus(['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']), detail: 'Future Drive/Gmail/Calendar access only through OAuth scopes and approval gates.' },
     { area: 'Secret policy', status: 'masked', detail: 'This page shows configured/not-configured state only. Secret values are never rendered.' },
   ];
 }

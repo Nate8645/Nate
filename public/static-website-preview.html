@@ -709,8 +709,13 @@ body::before {
 .permission-card.critical { border-color: rgba(255,84,112,.42); }
 .permission-card form { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
 .permission-card select { min-width: 0; }
+.data-control-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.danger-form { display: grid; gap: 10px; align-content: start; padding: 16px; border-radius: 20px; border: 1px solid rgba(255,84,112,.28); background: linear-gradient(180deg, rgba(255,84,112,.08), rgba(255,255,255,.045)); }
+.danger-form strong { color: #ffd166; }
+.danger-form span, .danger-form label { color: var(--muted); font-size: .92rem; }
+.danger-form input { margin-top: 8px; }
 @media (max-width: 1200px) { .agent-grid { grid-template-columns: repeat(2, minmax(220px,1fr)); } }
-@media (max-width: 760px) { .agent-grid, .trust-grid, .mini-link-grid { grid-template-columns: 1fr; } .permission-card form { flex-direction: column; align-items: stretch; } }
+@media (max-width: 760px) { .agent-grid, .trust-grid, .mini-link-grid, .data-control-actions { grid-template-columns: 1fr; } .permission-card form { flex-direction: column; align-items: stretch; } }
 
 /* AI Operating System expansion */
 .command-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; background: rgba(255,255,255,.055); }
@@ -848,7 +853,7 @@ body::before {
     <section class="section trust-snapshot-section">
     <div class="container">
       <div class="section-heading reveal"><p class="eyebrow">Trust-first product</p><h2>You always see what the AI can do, what it did, and what needs approval.</h2><p>UltraLaunch AI is positioned as a premium business system, but it stays honest: prepared integrations are labeled as prepared, secrets are not stored in code, and risky actions stop at the approval gate.</p></div>
-      <div class="trust-snapshot-grid"><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Security</h3><p>Critical computer, payment, terminal, and connected-account actions require approval by default.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Privacy</h3><p>Secrets stay in environment variables. Users can inspect memory and export/delete account data.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Permissions</h3><p>Each agent has ALLOW / ASK / DENY controls for tools such as browser, files, APIs, payments, and desktop.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Activity logs</h3><p>The platform records AI tasks, approvals, integration checks, security changes, and billing events.</p></article></div>
+      <div class="trust-snapshot-grid"><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Security</h3><p>Critical computer, payment, terminal, and connected-account actions require approval by default.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Privacy</h3><p>Secrets stay in environment variables. Users can inspect memory, export account data, delete AI memories/generated kits, and revoke other sessions.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Permissions</h3><p>Each agent has ALLOW / ASK / DENY controls for tools such as browser, files, APIs, payments, and desktop.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Activity logs</h3><p>The platform records AI tasks, approvals, integration checks, security changes, and billing events.</p></article></div>
       <div class="trust-mini-cta reveal"><span>Transparent AI policy:</span><strong>WHAT · WHY · DATA USED · TOOL · EXPECTED RESULT · RISK · APPROVE / DENY</strong><a class="text-link" href="/trust-center">Open Trust Center →</a></div>
     </div>
   </section>

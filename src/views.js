@@ -305,7 +305,7 @@ function proofCard(title, body) {
 function trustSnapshotSection() {
   const items = [
     ['Security', 'Critical computer, payment, terminal, and connected-account actions require approval by default.'],
-    ['Privacy', 'Secrets stay in environment variables. Users can inspect memory and export/delete account data.'],
+    ['Privacy', 'Secrets stay in environment variables. Users can inspect memory, export account data, delete AI memories/generated kits, and revoke other sessions.'],
     ['Permissions', 'Each agent has ALLOW / ASK / DENY controls for tools such as browser, files, APIs, payments, and desktop.'],
     ['Activity logs', 'The platform records AI tasks, approvals, integration checks, security changes, and billing events.'],
   ];

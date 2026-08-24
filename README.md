@@ -18,14 +18,14 @@ It includes:
 - Central AI Command Center with AI chat, deterministic orchestrator, task creation, approvals, projects, files, analytics, and security navigation
 - Massive AI Workforce architecture with 50+ specialist agents, custom AI employees, roles, goals, tools, permissions, memory scopes, KPIs, logs, and approval rules
 - MCP-style Integration Marketplace for GitHub, Shopify, Stripe, Google, Slack, Notion, CRMs, social platforms, databases, cloud, analytics, and more; prepared integrations clearly remain unauthenticated until official OAuth/API credentials are added
-- Trust/Security Center with permission controls, action explainers, kill switch, session visibility, AI action history, API/secret readiness, data-usage retention overview, memory/launch-kit deletion controls, connected-account readiness, session revocation, and JSON data export
+- Trust/Security Center with permission controls, action explainers, kill switch, session visibility, AI action history, API/secret readiness, data-usage retention overview, memory/launch-kit deletion controls, privacy request queue, connected-account readiness, session revocation, and JSON data export
 - Automation Engine with triggers, conditions, actions, schedules, proactive autopilot signals, and human-approval gates
 - Knowledge Base / Files / Projects layer for notes, URLs, PDFs, documents, screenshots, databases, and cloud-storage references
 - Computer Permission Matrix with per-agent ALLOW / ASK / DENY rules
 - Desktop + Browser AI planner with action explainers before critical work
 - Mobile and Voice Command Center readiness for iPhone approval flows and future STT/TTS/realtime AI
 - Customer support contact and ticket flow
-- Public Trust Center, Privacy Policy, and Terms pages with transparent AI action, data, permission, pricing, and support explanations
+- Public Trust Center, Privacy Policy, Terms, Subprocessors register, and `/.well-known/security.txt` with transparent AI action, data, permission, pricing, provider, security-contact, and support explanations
 - GitHub Skills & Plugin Integration audit dashboard at `/developer-tools`, mapping Claude skills/agents/commands into least-privilege UltraLaunch AI agent playbooks without blind execution
 - SEO assets: sitemap, robots, metadata
 - Security baseline: password hashing, CSRF, rate limits, verified webhooks, env-based secrets

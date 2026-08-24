@@ -88,6 +88,7 @@ function createApp(options = {}) {
   app.get('/trust-center', (req, res) => res.send(views.publicTrustPage(req)));
   app.get('/privacy', (req, res) => res.send(views.privacyPage(req)));
   app.get('/terms', (req, res) => res.send(views.termsPage(req)));
+  app.get('/subprocessors', (req, res) => res.send(views.subprocessorsPage(req)));
 
   app.get('/contact', (req, res) => res.send(views.contactPage(req)));
   app.post('/contact', rateLimit({ windowMs: 15 * 60 * 1000, max: 6, prefix: 'contact' }), (req, res) => {
@@ -485,6 +486,28 @@ function createApp(options = {}) {
     res.redirect(`/trust?message=${encodeURIComponent(`${deleted} generated launch kits deleted`)}`);
   });
 
+  app.post('/trust/privacy-requests', requireAuth, rateLimit({ windowMs: 24 * 60 * 60 * 1000, max: 5, prefix: 'privacy-request' }), (req, res) => {
+    try {
+      const requestType = safeChoice(req.body.requestType, ['access_export', 'delete_account_data', 'correct_data', 'restrict_processing', 'billing_data_review'], 'access_export');
+      const details = safeText(req.body.details, 1600);
+      const createdAt = nowIso();
+      run(db, `INSERT INTO privacy_requests (user_id, name, email, request_type, details, status, created_at, updated_at)
+               VALUES (:userId, :name, :email, :requestType, :details, 'received', :createdAt, :updatedAt)`, {
+        userId: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        requestType,
+        details,
+        createdAt,
+        updatedAt: createdAt,
+      });
+      logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'privacy_request_created', status: 'received', riskLevel: 'medium', permissionKey: 'audit_logs', summary: `Privacy request created: ${requestType}` });
+      res.redirect('/trust?message=Privacy%20request%20received');
+    } catch (error) {
+      res.redirect(`/trust?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
   app.post('/trust/sessions/revoke-others', requireAuth, (req, res) => {
     const revoked = run(db, 'DELETE FROM sessions WHERE user_id = :userId AND id != :sessionId', { userId: req.user.id, sessionId: req.session.id }).changes || 0;
     logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'other_sessions_revoked', status: 'completed', riskLevel: 'medium', permissionKey: 'audit_logs', summary: `User revoked ${revoked} other sessions` });
@@ -679,6 +702,17 @@ function createApp(options = {}) {
     res.redirect('/admin?message=Pilot%20lead%20updated');
   });
 
+  app.post('/admin/privacy-requests/:id/status', requireAdmin, (req, res) => {
+    const status = safeChoice(req.body.status, ['received', 'reviewing', 'waiting_for_user', 'completed', 'declined'], 'received');
+    run(db, 'UPDATE privacy_requests SET status = :status, response_note = :responseNote, updated_at = :updatedAt WHERE id = :id', {
+      status,
+      responseNote: safeText(req.body.responseNote, 800, false),
+      updatedAt: nowIso(),
+      id: Number(req.params.id),
+    });
+    res.redirect('/admin?message=Privacy%20request%20updated');
+  });
+
   app.get('/admin/pilot-requests.csv', requireAdmin, (req, res) => {
     const rows = all(db, 'SELECT id, name, email, company, website, offer, urgency, budget, status, created_at FROM pilot_requests ORDER BY created_at DESC');
     sendCsv(res, 'pilot-requests.csv', ['id', 'name', 'email', 'company', 'website', 'offer', 'urgency', 'budget', 'status', 'created_at'], rows);
@@ -699,9 +733,24 @@ function createApp(options = {}) {
     res.type('text/plain').send('User-agent: *\nAllow: /\nSitemap: ' + (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '') + '/sitemap.xml\n');
   });
 
+  app.get(['/security.txt', '/.well-known/security.txt'], (req, res) => {
+    const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+    const support = process.env.SUPPORT_EMAIL || 'support@example.com';
+    res.type('text/plain').send([
+      `Contact: mailto:${support}`,
+      `Policy: ${base}/trust-center`,
+      `Canonical: ${base}/.well-known/security.txt`,
+      'Preferred-Languages: en, de',
+      'Hiring: false',
+      '',
+      'Please do not include secrets in reports. UltraLaunch AI does not run a public bug-bounty program yet.',
+      '',
+    ].join('\n'));
+  });
+
   app.get('/sitemap.xml', (req, res) => {
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-    const paths = ['/', '/product', '/features', '/about', '/pricing', '/demo', '/pilot', '/use-cases', '/faq', '/trust-center', '/privacy', '/terms', '/contact', '/login', '/register'];
+    const paths = ['/', '/product', '/features', '/about', '/pricing', '/demo', '/pilot', '/use-cases', '/faq', '/trust-center', '/privacy', '/terms', '/subprocessors', '/contact', '/login', '/register'];
     res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${paths.map((p) => `<url><loc>${base}${p}</loc></url>`).join('')}</urlset>`);
   });
 
@@ -746,9 +795,10 @@ function adminView(req, db, message = '') {
   const users = all(db, 'SELECT id, name, email, role, plan, subscription_status, created_at FROM users ORDER BY created_at DESC LIMIT 20');
   const tickets = all(db, `SELECT * FROM support_tickets WHERE status != 'closed' ORDER BY created_at DESC LIMIT 20`);
   const pilotRequests = all(db, `SELECT * FROM pilot_requests WHERE status != 'lost' ORDER BY created_at DESC LIMIT 20`);
+  const privacyRequests = all(db, `SELECT * FROM privacy_requests WHERE status NOT IN ('completed','declined') ORDER BY created_at DESC LIMIT 20`);
   const orders = all(db, `SELECT * FROM orders ORDER BY created_at DESC LIMIT 20`);
   const events = all(db, 'SELECT * FROM analytics_events ORDER BY created_at DESC LIMIT 30');
-  return views.adminPage(req, { metrics, users, tickets, pilotRequests, orders, events, message });
+  return views.adminPage(req, { metrics, users, tickets, pilotRequests, privacyRequests, orders, events, message });
 }
 
 function refreshReqUser(req, db) {

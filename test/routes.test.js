@@ -49,6 +49,18 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.equal(res.status, 200);
     assert.match(await res.text(), /Terms of Service/);
 
+    res = await request('/subprocessors');
+    assert.equal(res.status, 200);
+    const subprocessorsHtml = await res.text();
+    assert.match(subprocessorsHtml, /Subprocessors/);
+    assert.match(subprocessorsHtml, /Prepared connectors are not live/);
+
+    res = await request('/.well-known/security.txt');
+    assert.equal(res.status, 200);
+    const securityTxt = await res.text();
+    assert.match(securityTxt, /Contact: mailto:/);
+    assert.match(securityTxt, /Policy: .*\/trust-center/);
+
     res = await request('/register');
     const registerHtml = await res.text();
     const csrf = extractCsrf(registerHtml);
@@ -165,6 +177,45 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     });
     assert.equal(res.status, 302);
     assert.match(res.headers.get('location'), /^\/trust\?message=/);
+
+    res = await request('/trust');
+    const trustRequestHtml = await res.text();
+    assert.match(trustRequestHtml, /Privacy request center/);
+    const privacyCsrf = extractCsrf(trustRequestHtml);
+    res = await request('/trust/privacy-requests', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: privacyCsrf,
+        requestType: 'delete_account_data',
+        details: 'Please review which account-owned records can be deleted after export.',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/trust?message=Privacy%20request%20received');
+
+    res = await request('/trust');
+    const trustWithRequestHtml = await res.text();
+    assert.match(trustWithRequestHtml, /delete_account_data/);
+
+    res = await request('/admin');
+    const adminPrivacyHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(adminPrivacyHtml, /Privacy requests/);
+    const privacyRequestId = adminPrivacyHtml.match(/\/admin\/privacy-requests\/(\d+)\/status/)?.[1];
+    assert.ok(privacyRequestId);
+    const adminPrivacyCsrf = extractCsrf(adminPrivacyHtml);
+    res = await request(`/admin/privacy-requests/${privacyRequestId}/status`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        csrf_token: adminPrivacyCsrf,
+        status: 'reviewing',
+        responseNote: 'Review started. No secret values requested.',
+      }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/admin?message=Privacy%20request%20updated');
 
     res = await request('/automations');
     const automationsHtml = await res.text();

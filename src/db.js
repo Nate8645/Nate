@@ -142,6 +142,22 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_pilot_requests_status ON pilot_requests(status);
     CREATE INDEX IF NOT EXISTS idx_pilot_requests_created ON pilot_requests(created_at);
 
+    CREATE TABLE IF NOT EXISTS privacy_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      request_type TEXT NOT NULL,
+      details TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'received',
+      response_note TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_privacy_requests_user ON privacy_requests(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_privacy_requests_status ON privacy_requests(status);
+
     CREATE TABLE IF NOT EXISTS orders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -527,6 +543,7 @@ function dashboardMetrics(db) {
     automationRules: Number(one(db, 'SELECT COUNT(*) AS n FROM automation_rules WHERE is_enabled = 1')?.n || 0),
     integrationsPrepared: Number(one(db, 'SELECT COUNT(*) AS n FROM integration_connections')?.n || 0),
     knowledgeSources: Number(one(db, 'SELECT COUNT(*) AS n FROM knowledge_sources')?.n || 0),
+    privacyRequests: Number(one(db, `SELECT COUNT(*) AS n FROM privacy_requests WHERE status NOT IN ('completed','declined')`)?.n || 0),
     openTickets: Number(one(db, `SELECT COUNT(*) AS n FROM support_tickets WHERE status = 'open'`)?.n || 0),
     visitsToday: Number(one(db, `SELECT COUNT(*) AS n FROM analytics_events WHERE event_name = 'page_view' AND created_at >= :dayIso`, { dayIso })?.n || 0),
     signupsToday: Number(one(db, `SELECT COUNT(*) AS n FROM users WHERE created_at >= :dayIso`, { dayIso })?.n || 0),

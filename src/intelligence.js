@@ -252,6 +252,7 @@ function trustDataUsage(db, userId) {
     { label: 'Approval records', value: trustCount(db, 'SELECT COUNT(*) AS n FROM action_approvals WHERE user_id = :userId', { userId }), retention: 'Human-control evidence for critical actions.' },
     { label: 'Knowledge sources', value: trustCount(db, 'SELECT COUNT(*) AS n FROM knowledge_sources WHERE user_id = :userId', { userId }), retention: 'Customer-provided project context; exportable with account data.' },
     { label: 'Connected-account records', value: trustCount(db, 'SELECT COUNT(*) AS n FROM connected_accounts WHERE user_id = :userId', { userId }), retention: 'Connection status/scopes only; secrets stay out of the database.' },
+    { label: 'Privacy requests', value: trustCount(db, 'SELECT COUNT(*) AS n FROM privacy_requests WHERE user_id = :userId', { userId }), retention: 'Access/deletion/correction requests tracked for accountable support handling.' },
     { label: 'Active sessions', value: trustCount(db, 'SELECT COUNT(*) AS n FROM sessions WHERE user_id = :userId', { userId }), retention: 'Login security records; other sessions can be revoked.' },
   ];
 }
@@ -287,6 +288,7 @@ function userTrustSnapshot(db, userId) {
     automations: all(db, 'SELECT * FROM automation_rules WHERE user_id = :userId ORDER BY created_at DESC LIMIT 50', { userId }),
     tasks: all(db, 'SELECT * FROM agent_tasks WHERE user_id = :userId ORDER BY created_at DESC LIMIT 50', { userId }),
     approvals: all(db, 'SELECT * FROM action_approvals WHERE user_id = :userId ORDER BY created_at DESC LIMIT 50', { userId }),
+    privacyRequests: all(db, 'SELECT * FROM privacy_requests WHERE user_id = :userId ORDER BY created_at DESC LIMIT 20', { userId }),
     connectedAccounts: all(db, 'SELECT * FROM connected_accounts WHERE user_id = :userId ORDER BY created_at DESC LIMIT 20', { userId }),
     sessions: all(db, `SELECT id, ip, user_agent, created_at, expires_at
                        FROM sessions WHERE user_id = :userId ORDER BY created_at DESC LIMIT 10`, { userId }),
@@ -339,6 +341,7 @@ function exportUserData(db, user) {
     analyticsEvents: all(db, 'SELECT * FROM analytics_events WHERE user_id = :userId ORDER BY created_at DESC', { userId }),
     supportTickets: all(db, 'SELECT * FROM support_tickets WHERE user_id = :userId ORDER BY created_at DESC', { userId }),
     pilotRequests: all(db, 'SELECT * FROM pilot_requests WHERE user_id = :userId ORDER BY created_at DESC', { userId }),
+    privacyRequests: all(db, 'SELECT * FROM privacy_requests WHERE user_id = :userId ORDER BY created_at DESC', { userId }),
     orders: all(db, 'SELECT * FROM orders WHERE user_id = :userId ORDER BY created_at DESC', { userId }),
     memories: all(db, 'SELECT * FROM user_memories WHERE user_id = :userId ORDER BY updated_at DESC', { userId }),
     permissions: all(db, 'SELECT * FROM permission_grants WHERE user_id = :userId ORDER BY permission_key', { userId }),

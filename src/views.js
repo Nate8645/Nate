@@ -183,8 +183,13 @@ function heroPage(req) {
       <div class="container hero-grid premium-hero-grid">
         <div class="hero-copy reveal">
           <p class="eyebrow glow-label">Trusted AI Launch Operating System</p>
-          <h1><span class="text-gradient">Turn a rough offer</span> into a visible, permission-controlled launch machine.</h1>
-          <p class="hero-subtitle">UltraLaunch AI is for founders, agencies, consultants, and ecommerce operators who need ICP, positioning, pricing, landing copy, outreach, sales scripts, support flows, and a 24-hour execution plan — with transparent AI actions, human approvals, privacy controls, and no fabricated proof.</p>
+          <h1><span class="text-gradient">What are you launching today?</span> Turn one rough offer into a premium sales-ready AI workspace.</h1>
+          <p class="hero-subtitle">UltraLaunch AI is for founders, agencies, consultants, and ecommerce operators who need ICP, positioning, pricing, landing copy, SEO/social content, outreach, sales scripts, support flows, and a 24-hour execution plan — with transparent AI actions, human approvals, privacy controls, and no fabricated proof.</p>
+          <div class="launch-prompt-card" aria-label="AI launch prompt preview">
+            <div class="prompt-model-strip"><span>Strategy Agent</span><span>Marketing Agent</span><span>Developer Agent</span><span>Trust Guardian</span></div>
+            <div class="prompt-input-row"><span>Ask UltraLaunch to build…</span><strong>A premium launch kit for my next paid offer</strong><a class="btn btn-small magnetic" href="/register">Start</a></div>
+            <div class="creator-type-grid"><a href="/demo">Launch Kit</a><a href="/product">Website</a><a href="/pricing">Pricing</a><a href="/features">Outreach</a><a href="/trust-center">Trust</a><a href="/subprocessors">Providers</a></div>
+          </div>
           <div class="hero-actions">
             <a class="btn magnetic" href="/register">Generate my free kit</a>
             <a class="btn btn-secondary magnetic" href="/trust-center">Review trust model</a>
@@ -198,7 +203,7 @@ function heroPage(req) {
           </div>
         </div>
         <div class="hero-stage reveal" aria-label="Premium product visual">
-          ${productVisual()}
+          ${arenaProductVisual()}
         </div>
       </div>
     </section>
@@ -291,6 +296,26 @@ function productVisual() {
         <div class="timeline-mini"><i style="width:32%"></i><i style="width:62%"></i><i style="width:88%"></i></div>
       </div>
     </div>
+  </div>`;
+}
+
+function arenaProductVisual() {
+  const rows = [
+    ['Marketing Agent', 'Creates landing angles + launch posts', 'ASK before publishing'],
+    ['Developer Agent', 'Checks repo routes + deployment gates', 'ASK before deploy'],
+    ['Research Agent', 'Maps ICP evidence + objections', 'Read-only by default'],
+    ['Support Agent', 'Drafts help replies + ticket summaries', 'ASK before sending'],
+  ];
+  return `<div class="arena-stage-card" data-tilt>
+    <div class="arena-stage-top"><span class="brand-mark">UL</span><div><strong>AI Launch Arena</strong><small>Visible agents · controlled actions</small></div></div>
+    <div class="arena-command-window">
+      <div class="arena-command-head"><span></span><span></span><span></span><em>launch prompt</em></div>
+      <h3>Build a 24-hour launch plan for a Shopify retention audit.</h3>
+      <div class="arena-progress"><i style="width:28%"></i><i style="width:64%"></i><i style="width:88%"></i></div>
+      <div class="arena-output-grid"><div><strong>ICP</strong><small>buyer trigger</small></div><div><strong>Page</strong><small>hero + FAQ</small></div><div><strong>Sales</strong><small>DM + call script</small></div></div>
+    </div>
+    <div class="arena-agent-board">${rows.map(([name, task, policy], index) => `<article class="arena-agent-card"><span class="status-dot ${index === 0 ? 'live' : ''}"></span><div><strong>${e(name)}</strong><p>${e(task)}</p></div><em>${e(policy)}</em></article>`).join('')}</div>
+    <div class="arena-approval-card"><span class="status-pill">Approval gate</span><strong>WHAT · WHY · DATA USED · TOOL · EXPECTED RESULT · RISK</strong></div>
   </div>`;
 }
 

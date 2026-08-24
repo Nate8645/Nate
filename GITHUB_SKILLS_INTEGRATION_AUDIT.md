@@ -122,6 +122,7 @@ Existing/required for current app or future connectors:
 - Runtime repository extension inventory with dependency/permission/API/risk/value metadata.
 - Least-privilege mapping from repo skills/agents/commands to UltraLaunch AI agents.
 - Public Trust Center explaining security, privacy, permissions, data controls, activity logs, AI transparency, human control, support, pricing, terms, privacy policy, and no-fake-proof policy.
+- Authenticated Trust Center now includes data-usage/retention counts, API/secret readiness without exposing values, all-memory deletion, generated-kit deletion with typed confirmation, and other-session revocation.
 - Homepage trust-first messaging and AI Action Center examples.
 - Sitemap entries for trust/legal pages.
 

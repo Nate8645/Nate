@@ -240,9 +240,42 @@ function upsertMemory(db, { userId, key, value, source = 'system', confidence = 
   });
 }
 
+function trustCount(db, sql, params) {
+  return Number(one(db, sql, params)?.n || 0);
+}
+
+function trustDataUsage(db, userId) {
+  return [
+    { label: 'Generated launch kits', value: trustCount(db, 'SELECT COUNT(*) AS n FROM launch_kits WHERE user_id = :userId', { userId }), retention: 'Customer-owned generated outputs; removable from Trust Center.' },
+    { label: 'AI memories', value: trustCount(db, 'SELECT COUNT(*) AS n FROM user_memories WHERE user_id = :userId', { userId }), retention: 'Editable/deletable user memories used for personalization.' },
+    { label: 'AI action logs', value: trustCount(db, 'SELECT COUNT(*) AS n FROM ai_action_logs WHERE user_id = :userId', { userId }), retention: 'Security/audit evidence retained for transparency and abuse prevention.' },
+    { label: 'Approval records', value: trustCount(db, 'SELECT COUNT(*) AS n FROM action_approvals WHERE user_id = :userId', { userId }), retention: 'Human-control evidence for critical actions.' },
+    { label: 'Knowledge sources', value: trustCount(db, 'SELECT COUNT(*) AS n FROM knowledge_sources WHERE user_id = :userId', { userId }), retention: 'Customer-provided project context; exportable with account data.' },
+    { label: 'Connected-account records', value: trustCount(db, 'SELECT COUNT(*) AS n FROM connected_accounts WHERE user_id = :userId', { userId }), retention: 'Connection status/scopes only; secrets stay out of the database.' },
+    { label: 'Active sessions', value: trustCount(db, 'SELECT COUNT(*) AS n FROM sessions WHERE user_id = :userId', { userId }), retention: 'Login security records; other sessions can be revoked.' },
+  ];
+}
+
+function envStatus(key) {
+  return process.env[key] ? 'configured' : 'not configured';
+}
+
+function trustApiAccess() {
+  return [
+    { area: 'AI provider', status: process.env.OPENAI_API_KEY ? 'external provider configured' : 'offline engine active', detail: process.env.OPENAI_API_KEY ? 'Prompts needed for generation can be sent to the configured OpenAI-compatible endpoint.' : 'Launch kits use deterministic local generation; no external LLM key is required for local demos.' },
+    { area: 'Stripe billing', status: process.env.STRIPE_SECRET_KEY ? 'secret configured' : 'not configured', detail: 'Checkout/webhooks are implemented, but live payments require Stripe secrets and price IDs.' },
+    { area: 'GitHub connector', status: envStatus('GITHUB_CLIENT_ID'), detail: 'Future OAuth/App integration only. No repo write actions are live without official credentials and approval.' },
+    { area: 'Shopify connector', status: envStatus('SHOPIFY_CLIENT_ID'), detail: 'Future store integration only. No store data is accessed until OAuth credentials and scopes are configured.' },
+    { area: 'Google connector', status: envStatus('GOOGLE_CLIENT_ID'), detail: 'Future Drive/Gmail/Calendar access only through OAuth scopes and approval gates.' },
+    { area: 'Secret policy', status: 'masked', detail: 'This page shows configured/not-configured state only. Secret values are never rendered.' },
+  ];
+}
+
 function userTrustSnapshot(db, userId) {
   ensureTrustDefaults(db, userId);
   return {
+    dataUsage: trustDataUsage(db, userId),
+    apiAccess: trustApiAccess(),
     permissions: all(db, 'SELECT * FROM permission_grants WHERE user_id = :userId ORDER BY permission_key', { userId })
       .map((grant) => ({ ...grant, ...(permissionCatalog.find((p) => p.key === grant.permission_key) || {}) })),
     permissionRules: all(db, 'SELECT * FROM agent_permission_rules WHERE user_id = :userId ORDER BY agent_key, permission_key LIMIT 120', { userId }),

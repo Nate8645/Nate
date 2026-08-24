@@ -470,6 +470,27 @@ function createApp(options = {}) {
     res.redirect('/trust?message=Memory%20deleted');
   });
 
+  app.post('/trust/memories/delete-all', requireAuth, (req, res) => {
+    const deleted = run(db, 'DELETE FROM user_memories WHERE user_id = :userId', { userId: req.user.id }).changes || 0;
+    logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'all_memories_deleted', status: 'completed', riskLevel: 'medium', permissionKey: 'ai_memory', summary: `User deleted ${deleted} AI memories` });
+    res.redirect(`/trust?message=${encodeURIComponent(`${deleted} AI memories deleted`)}`);
+  });
+
+  app.post('/trust/data/launch-kits/delete', requireAuth, (req, res) => {
+    if (safeText(req.body.confirm, 20, false) !== 'DELETE') {
+      return res.redirect('/trust?error=Type%20DELETE%20to%20remove%20generated%20launch%20kits');
+    }
+    const deleted = run(db, 'DELETE FROM launch_kits WHERE user_id = :userId', { userId: req.user.id }).changes || 0;
+    logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'generated_launch_kits_deleted', status: 'completed', riskLevel: 'high', permissionKey: 'file_management', summary: `User deleted ${deleted} generated launch kits` });
+    res.redirect(`/trust?message=${encodeURIComponent(`${deleted} generated launch kits deleted`)}`);
+  });
+
+  app.post('/trust/sessions/revoke-others', requireAuth, (req, res) => {
+    const revoked = run(db, 'DELETE FROM sessions WHERE user_id = :userId AND id != :sessionId', { userId: req.user.id, sessionId: req.session.id }).changes || 0;
+    logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'other_sessions_revoked', status: 'completed', riskLevel: 'medium', permissionKey: 'audit_logs', summary: `User revoked ${revoked} other sessions` });
+    res.redirect(`/trust?message=${encodeURIComponent(`${revoked} other sessions revoked`)}`);
+  });
+
   app.get('/trust/export.json', requireAuth, (req, res) => {
     logAction(db, { userId: req.user.id, agentKey: 'trust-guardian', actionType: 'data_export_created', status: 'completed', riskLevel: 'medium', permissionKey: 'file_management', summary: 'User exported account data' });
     res.setHeader('Content-Type', 'application/json');

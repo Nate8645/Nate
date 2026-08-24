@@ -131,6 +131,40 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.equal(res.status, 200);
     assert.match(trustHtml, /Trust center/);
     assert.match(trustHtml, /Terminal \/ Computer Actions/);
+    assert.match(trustHtml, /Data usage & retention/);
+    assert.match(trustHtml, /API access & secret state/);
+    assert.match(trustHtml, /Deletion controls/);
+    const trustCsrf = extractCsrf(trustHtml);
+
+    res = await request('/trust/memories/delete-all', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ csrf_token: trustCsrf }),
+    });
+    assert.equal(res.status, 302);
+    assert.match(res.headers.get('location'), /^\/trust\?message=/);
+
+    res = await request('/trust');
+    const trustAfterMemoryHtml = await res.text();
+    const trustDataCsrf = extractCsrf(trustAfterMemoryHtml);
+    res = await request('/trust/data/launch-kits/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ csrf_token: trustDataCsrf, confirm: 'DELETE' }),
+    });
+    assert.equal(res.status, 302);
+    assert.match(res.headers.get('location'), /^\/trust\?message=/);
+
+    res = await request('/trust');
+    const trustSessionHtml = await res.text();
+    const trustSessionCsrf = extractCsrf(trustSessionHtml);
+    res = await request('/trust/sessions/revoke-others', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ csrf_token: trustSessionCsrf }),
+    });
+    assert.equal(res.status, 302);
+    assert.match(res.headers.get('location'), /^\/trust\?message=/);
 
     res = await request('/automations');
     const automationsHtml = await res.text();

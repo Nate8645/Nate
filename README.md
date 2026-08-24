@@ -99,8 +99,11 @@ No Stripe secrets are committed. To accept real payments:
 ```bash
 npm test
 npm run lint
+npm run repo:audit
 npm run launch:check
 ```
+
+`npm run repo:audit` prints the same Claude Skills / plugin / agent / MCP / script inventory that is visible in the authenticated `/developer-tools` page and downloadable at `/developer-tools/audit.json`.
 
 `npm run launch:check` intentionally exits non-zero until production secrets, Stripe prices, webhook secret, and HTTPS `APP_URL` are configured.
 

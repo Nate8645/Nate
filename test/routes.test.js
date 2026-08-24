@@ -227,6 +227,14 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.match(developerToolsHtml, /GitHub Skills \+ Plugin Integration/);
     assert.match(developerToolsHtml, /Least-privilege agent bindings/);
     assert.match(developerToolsHtml, /MCP configurations/);
+    assert.match(developerToolsHtml, /Download audit JSON/);
+
+    res = await request('/developer-tools/audit.json');
+    assert.equal(res.status, 200);
+    const auditJson = await res.json();
+    assert.ok(auditJson.summary.total >= 1);
+    assert.ok(auditJson.records.some((record) => record.type === 'skill'));
+    assert.ok(auditJson.bindings.some((binding) => binding.agentKey === 'developer-agent'));
 
     res = await request('/permissions');
     const permissionsHtml = await res.text();

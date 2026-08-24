@@ -329,6 +329,11 @@ function createApp(options = {}) {
     res.send(views.developerToolsPage(req, { audit: repositoryExtensionAudit() }));
   });
 
+  app.get('/developer-tools/audit.json', requireAuth, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(repositoryExtensionAudit());
+  });
+
   app.post('/employees', requireAuth, (req, res) => {
     try {
       const role = safeText(req.body.role, 240);

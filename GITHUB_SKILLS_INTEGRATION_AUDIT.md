@@ -39,7 +39,7 @@ Inspected categories:
 | `.claude/agents/*.md` | Claude agent instructions | Integrated as adapter | 10 role templates mapped to UltraLaunch AI agents with least-privilege web-app capabilities. |
 | `.claude/commands/ultra*.md` | Claude commands | Adapter only | Slash commands remain Claude Code assets; the SaaS displays and reuses them as playbooks, not direct browser executable commands. |
 | `ultra-enterprise-os/` | Plugin package mirror | Integrated/documented | README install source corrected; org chart and manifests preserved. |
-| `package.json` scripts | Developer tools | Integrated runtime | `npm run lint`, `npm test`, and `npm run launch:check` remain local gates. Stripe setup scripts require secrets. |
+| `package.json` scripts | Developer tools | Integrated runtime | `npm run lint`, `npm test`, `npm run repo:audit`, and `npm run launch:check` remain local gates. Stripe setup scripts require secrets. |
 | `.github/workflows` | CI workflows | Not present | CI was not reintroduced because earlier pushes failed without workflow permission. |
 | MCP configs | MCP | Not present | No concrete MCP server config exists in this branch. Existing SaaS integration catalog remains prepared, not claimed live. |
 
@@ -54,6 +54,9 @@ Implemented in this change:
   - Produces dependency, permission, API, compatibility, risk, and business-value summaries.
 - New authenticated Developer Tools surface: `/developer-tools`
   - Shows scan counts, integration policy, least-privilege agent bindings, extension inventory, environment variables, and compatibility issues.
+  - Adds `/developer-tools/audit.json` for authenticated machine-readable audit export.
+- New CLI quality gate: `npm run repo:audit`
+  - Prints the same repository extension inventory without requiring a browser session.
 - Command navigation now includes `Dev Tools`.
 - Existing plugin configuration was corrected to the active GitHub source: `Nate8645/Nate`.
 - Plugin package README install command was corrected to `Nate8645/Nate`.
@@ -114,6 +117,8 @@ Existing/required for current app or future connectors:
 ## NEUE FUNKTIONEN
 
 - `/developer-tools` authenticated GitHub Skills & Plugin audit dashboard.
+- `/developer-tools/audit.json` authenticated JSON export for repo-sourced extension governance.
+- `npm run repo:audit` CLI gate for repeatable local audits before future integrations.
 - Runtime repository extension inventory with dependency/permission/API/risk/value metadata.
 - Least-privilege mapping from repo skills/agents/commands to UltraLaunch AI agents.
 - Public Trust Center explaining security, privacy, permissions, data controls, activity logs, AI transparency, human control, support, pricing, terms, privacy policy, and no-fake-proof policy.
@@ -124,6 +129,7 @@ Existing/required for current app or future connectors:
 
 - `npm run lint`
 - `npm test`
+- `npm run repo:audit`
 - Smoke-check public routes: `/`, `/product`, `/trust-center`, `/privacy`, `/terms`, `/pricing`, `/demo`, `/health`
 - Smoke-check authenticated routes after registration/login: `/command`, `/developer-tools`, `/security`, `/permissions`, `/trust`
 - Re-run `npm run launch:check || true`; missing production secrets are expected until manual production setup is complete.

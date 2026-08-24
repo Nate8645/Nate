@@ -12,6 +12,7 @@
     "stripe:setup": "NODE_OPTIONS=--no-warnings node scripts/setup-stripe.js",
     "launch:check": "NODE_OPTIONS=--no-warnings node scripts/launch-check.js",
     "env:prepare": "NODE_OPTIONS=--no-warnings node scripts/prepare-local-env.js",
+    "repo:audit": "NODE_OPTIONS=--no-warnings node scripts/repo-audit.js",
     "seed": "NODE_OPTIONS=--no-warnings node scripts/seed.js"
   },
   "engines": {

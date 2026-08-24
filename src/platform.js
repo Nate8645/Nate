@@ -34,7 +34,7 @@ const integrationCatalog = [
 ];
 
 const commandNavigation = [
-  ['Dashboard', '/dashboard'], ['AI Chat', '/command'], ['Agents', '/agents'], ['Tasks', '/tasks'], ['Automations', '/automations'], ['Integrations', '/integrations'], ['Files', '/files'], ['Projects', '/projects'], ['Analytics', '/analytics'], ['Security', '/security'], ['Permissions', '/permissions'], ['Billing', '/billing'], ['Memory', '/memory'], ['Activity Logs', '/trust'],
+  ['Dashboard', '/dashboard'], ['AI Chat', '/command'], ['Agents', '/agents'], ['Tasks', '/tasks'], ['Automations', '/automations'], ['Integrations', '/integrations'], ['Dev Tools', '/developer-tools'], ['Files', '/files'], ['Projects', '/projects'], ['Analytics', '/analytics'], ['Security', '/security'], ['Permissions', '/permissions'], ['Billing', '/billing'], ['Memory', '/memory'], ['Activity Logs', '/trust'],
 ];
 
 function provider(key, name, description, authScopes, permissions, tools) {

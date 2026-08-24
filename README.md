@@ -25,6 +25,8 @@ It includes:
 - Desktop + Browser AI planner with action explainers before critical work
 - Mobile and Voice Command Center readiness for iPhone approval flows and future STT/TTS/realtime AI
 - Customer support contact and ticket flow
+- Public Trust Center, Privacy Policy, and Terms pages with transparent AI action, data, permission, pricing, and support explanations
+- GitHub Skills & Plugin Integration audit dashboard at `/developer-tools`, mapping Claude skills/agents/commands into least-privilege UltraLaunch AI agent playbooks without blind execution
 - SEO assets: sitemap, robots, metadata
 - Security baseline: password hashing, CSRF, rate limits, verified webhooks, env-based secrets
 
@@ -125,4 +127,4 @@ See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for a production checklist.
 
 ## Original plugin
 
-The original plugin remains in [`ultra-enterprise-os/`](./ultra-enterprise-os/). This SaaS app is added at the repository root and does not remove the existing work.
+The original plugin remains in [`ultra-enterprise-os/`](./ultra-enterprise-os/). This SaaS app is added at the repository root and does not remove the existing work. The current integration audit lives in [`GITHUB_SKILLS_INTEGRATION_AUDIT.md`](./GITHUB_SKILLS_INTEGRATION_AUDIT.md) and is also visible inside the authenticated app at `/developer-tools`.

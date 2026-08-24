@@ -740,7 +740,34 @@ body::before {
 .mobile-command .mini-link-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 900px) { .automation-step-form { grid-template-columns: 1fr; } .mobile-command .mini-link-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.static-preview-banner{position:fixed;left:16px;right:16px;bottom:16px;z-index:9999;padding:12px 16px;border-radius:18px;background:rgba(7,9,20,.86);border:1px solid rgba(145,255,240,.28);color:#dce2ff;box-shadow:0 20px 60px rgba(0,0,0,.35);font:700 14px system-ui}.static-preview-banner strong{color:#91fff0}
+/* Trust-first customer experience + GitHub skills audit */
+.trust-snapshot-section { position: relative; }
+.trust-snapshot-grid, .trust-control-grid { display: grid; grid-template-columns: repeat(4, minmax(190px, 1fr)); gap: 16px; }
+.trust-snapshot-card, .trust-control-card, .trust-panel, .action-center-board { border: 1px solid rgba(145,255,240,.18); border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.04)); box-shadow: 0 28px 90px rgba(0,0,0,.18); padding: 24px; }
+.trust-snapshot-card p, .trust-control-card p { color: var(--muted); }
+.trust-mini-cta { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px 18px; border: 1px solid rgba(255,255,255,.13); border-radius: 22px; background: rgba(255,255,255,.055); }
+.trust-mini-cta span { color: var(--muted); font-weight: 850; }
+.trust-mini-cta strong { color: #91fff0; letter-spacing: .05em; font-size: .85rem; }
+.trust-mini-cta a { margin-left: auto; }
+.action-center-board { display: grid; gap: 12px; }
+.action-agent-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(150px, .65fr) minmax(110px, .45fr); gap: 12px; align-items: center; padding: 14px; border-radius: 18px; background: rgba(7,9,20,.35); border: 1px solid rgba(255,255,255,.1); }
+.action-agent-row div { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; }
+.action-agent-row p { grid-column: 2; margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.action-agent-row small { color: #c7cdec; }
+.action-agent-row em { justify-self: end; font-style: normal; color: #91fff0; font-weight: 900; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 rgba(145,255,240,0); }
+.status-dot.live { background: #91fff0; animation: trustPulse 1.8s ease-in-out infinite; }
+@keyframes trustPulse { 50% { box-shadow: 0 0 0 9px rgba(145,255,240,.09); } }
+.trust-panel dl { display: grid; grid-template-columns: 120px 1fr; gap: 10px 14px; margin: 18px 0; }
+.trust-panel dt { color: #91fff0; font-weight: 950; letter-spacing: .1em; font-size: .78rem; }
+.trust-panel dd { margin: 0; color: var(--muted); }
+.legal-doc { max-width: 940px; margin-inline: auto; }
+.legal-doc h2 { margin-top: 28px; }
+.legal-doc h2:first-child { margin-top: 0; }
+.legal-doc p { color: var(--muted); }
+@media (max-width: 1120px) { .trust-snapshot-grid, .trust-control-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .action-agent-row { grid-template-columns: 1fr; } .action-agent-row em { justify-self: start; } .trust-mini-cta a { margin-left: 0; } }
+@media (max-width: 720px) { .trust-snapshot-grid, .trust-control-grid, .trust-panel dl { grid-template-columns: 1fr; } .trust-mini-cta { align-items: flex-start; } }
+
 </style>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"UltraLaunch AI","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"http://localhost:3000","description":"A cinematic AI launch operating system that turns one offer brief into a website story, pricing ladder, outreach motion, and conversion dashboard.","offers":[{"@type":"Offer","name":"Starter","price":19,"priceCurrency":"USD","availability":"https://schema.org/InStock"},{"@type":"Offer","name":"Pro","price":49,"priceCurrency":"USD","availability":"https://schema.org/InStock"},{"@type":"Offer","name":"Business","price":149,"priceCurrency":"USD","availability":"https://schema.org/InStock"}]}</script>
 </head>
@@ -758,14 +785,15 @@ body::before {
       <button class="mobile-menu" data-menu-toggle aria-label="Open navigation" aria-expanded="false">Menu</button>
       <nav class="site-nav" data-menu aria-label="Primary navigation">
         <a class="nav-link active" href="/">Home</a>
-        <a class="nav-link " href="#product">Product</a>
-        <a class="nav-link " href="#features">Features</a>
-        <a class="nav-link " href="#about">About</a>
-        <a class="nav-link " href="#pricing">Pricing</a>
-        <a class="nav-link " href="#demo">Demo</a>
-        <a class="nav-link " href="#pilot">Sprint</a>
-        <a class="nav-link " href="#faq">FAQ</a>
-        <a class="nav-link " href="#start">Account</a><a class="btn btn-small magnetic" href="#start">Start free</a>
+        <a class="nav-link " href="/product">Product</a>
+        <a class="nav-link " href="/features">Features</a>
+        <a class="nav-link " href="/trust-center">Trust</a>
+        <a class="nav-link " href="/about">About</a>
+        <a class="nav-link " href="/pricing">Pricing</a>
+        <a class="nav-link " href="/demo">Demo</a>
+        <a class="nav-link " href="/pilot">Sprint</a>
+        <a class="nav-link " href="/faq">FAQ</a>
+        <a class="nav-link " href="/login">Account</a><a class="btn btn-small magnetic" href="/register">Start free</a>
       </nav>
     </div>
   </header>
@@ -774,19 +802,19 @@ body::before {
       <div class="hero-noise" aria-hidden="true"></div>
       <div class="container hero-grid premium-hero-grid">
         <div class="hero-copy reveal">
-          <p class="eyebrow glow-label">AI Launch Operating System</p>
-          <h1><span class="text-gradient">From offer idea</span> to sellable launch motion.</h1>
-          <p class="hero-subtitle">UltraLaunch AI turns one rough brief into premium positioning, pricing, landing copy, outreach scripts, content angles, support flows, usage tracking, and a revenue-ready dashboard.</p>
+          <p class="eyebrow glow-label">Trusted AI Launch Operating System</p>
+          <h1><span class="text-gradient">Turn a rough offer</span> into a visible, permission-controlled launch machine.</h1>
+          <p class="hero-subtitle">UltraLaunch AI is for founders, agencies, consultants, and ecommerce operators who need ICP, positioning, pricing, landing copy, outreach, sales scripts, support flows, and a 24-hour execution plan — with transparent AI actions, human approvals, privacy controls, and no fabricated proof.</p>
           <div class="hero-actions">
-            <a class="btn magnetic" href="#start">Generate my free kit</a>
-            <a class="btn btn-secondary magnetic" href="#product">Explore product</a>
-            <a class="btn btn-ghost" href="/watch-demo.html">Watch walkthrough</a>
+            <a class="btn magnetic" href="/register">Generate my free kit</a>
+            <a class="btn btn-secondary magnetic" href="/trust-center">Review trust model</a>
+            <a class="btn btn-ghost" href="/product">Explore product</a>
           </div>
           <div class="trust-row premium-trust" aria-label="Product proof points">
-            <span>No-card free workspace</span>
-            <span>Stripe-ready billing</span>
-            <span>$199 concierge sprint</span>
-            <span>No fake revenue claims</span>
+            <span>Human approval for critical actions</span>
+            <span>Activity logs + data export</span>
+            <span>Env-driven secrets</span>
+            <span>No fake customers or revenue</span>
           </div>
         </div>
         <div class="hero-stage reveal" aria-label="Premium product visual">
@@ -816,6 +844,27 @@ body::before {
         <span>Solo founders</span><span>AI agencies</span><span>Consultants</span><span>Shopify operators</span><span>Product marketers</span><span>Sales teams</span>
       </div>
     </section>
+
+    <section class="section trust-snapshot-section">
+    <div class="container">
+      <div class="section-heading reveal"><p class="eyebrow">Trust-first product</p><h2>You always see what the AI can do, what it did, and what needs approval.</h2><p>UltraLaunch AI is positioned as a premium business system, but it stays honest: prepared integrations are labeled as prepared, secrets are not stored in code, and risky actions stop at the approval gate.</p></div>
+      <div class="trust-snapshot-grid"><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Security</h3><p>Critical computer, payment, terminal, and connected-account actions require approval by default.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Privacy</h3><p>Secrets stay in environment variables. Users can inspect memory and export/delete account data.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Permissions</h3><p>Each agent has ALLOW / ASK / DENY controls for tools such as browser, files, APIs, payments, and desktop.</p></article><article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>Activity logs</h3><p>The platform records AI tasks, approvals, integration checks, security changes, and billing events.</p></article></div>
+      <div class="trust-mini-cta reveal"><span>Transparent AI policy:</span><strong>WHAT · WHY · DATA USED · TOOL · EXPECTED RESULT · RISK · APPROVE / DENY</strong><a class="text-link" href="/trust-center">Open Trust Center →</a></div>
+    </div>
+  </section>
+    <section class="section action-center-preview muted">
+    <div class="container split premium-split">
+      <div class="reveal">
+        <p class="eyebrow">AI Action Center</p>
+        <h2>Agents work visibly — not behind a black box.</h2>
+        <p class="muted-text">Customers can inspect every task, permission, data source, and approval request before the AI touches external systems or sensitive workflows.</p>
+        <a class="btn btn-secondary" href="/register">Try the command center</a>
+      </div>
+      <div class="action-center-board reveal" aria-label="AI Action Center preview">
+        <article class="action-agent-row"><div><span class="status-dot live"></span><strong>Marketing Agent</strong><p>Drafts SEO angles and launch posts</p></div><small>Uses offer brief + approved memory</small><em>ASK before publishing</em></article><article class="action-agent-row"><div><span class="status-dot "></span><strong>Developer Agent</strong><p>Plans integrations and checks routes</p></div><small>Uses repo inventory + test output</small><em>ASK before deploy actions</em></article><article class="action-agent-row"><div><span class="status-dot "></span><strong>Research Agent</strong><p>Compares positioning and buyer objections</p></div><small>Uses public web/repo notes when enabled</small><em>Read-only by default</em></article><article class="action-agent-row"><div><span class="status-dot "></span><strong>Support Agent</strong><p>Prepares help replies and ticket summaries</p></div><small>Uses tickets + account context</small><em>ASK before sending</em></article>
+      </div>
+    </div>
+  </section>
 
     <section class="section story-section">
       <div class="container narrative-grid">
@@ -849,7 +898,7 @@ body::before {
           <p class="eyebrow">Why customers buy</p>
           <h2>Premium output without weeks of brand, copy, and sales ops work.</h2>
           <p class="muted-text">Built for buyers who care about speed, clarity, and a concrete next sales action.</p>
-          <a class="text-link" href="#demo">Inspect the sample kit →</a>
+          <a class="text-link" href="/demo">Inspect the sample kit →</a>
         </div>
         <div class="card-grid three">
           <article class="card"><div class="icon-dot"></div><h3>First-customer speed</h3><p>The workflow points every section toward demos, replies, paid pilots, or stronger objections.</p></article>
@@ -884,8 +933,8 @@ body::before {
         <p>Start free, inspect a sample kit, or buy the concierge sprint when you need the first serious customer conversation fast.</p>
       </div>
       <div class="cta-actions">
-        <a class="btn btn-light magnetic" href="#start">Create free workspace</a>
-        <a class="btn btn-secondary" href="#demo">View sample kit</a>
+        <a class="btn btn-light magnetic" href="/register">Create free workspace</a>
+        <a class="btn btn-secondary" href="/demo">View sample kit</a>
       </div>
     </div>
   </section>
@@ -898,25 +947,28 @@ body::before {
       </div>
       <div>
         <span class="footer-title">Product</span>
-        <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#demo">Demo kit</a>
-        <a href="#pilot">Concierge sprint</a>
-        <a href="#use-cases">Use cases</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/demo">Demo kit</a>
+        <a href="/pilot">Concierge sprint</a>
+        <a href="/use-cases">Use cases</a>
       </div>
       <div>
         <span class="footer-title">Company</span>
-        <a href="#faq">FAQ</a>
-        <a href="#contact">Contact</a>
+        <a href="/faq">FAQ</a>
+        <a href="/contact">Contact</a>
         <a href="mailto:support@example.com">Support</a>
       </div>
       <div>
         <span class="footer-title">Trust</span>
+        <a href="/trust-center">Security & transparency</a>
+        <a href="/privacy">Privacy policy</a>
+        <a href="/terms">Terms</a>
         <p>No fake revenue, no hidden spend, no API keys in code. Stripe and LLMs are configured with environment variables.</p>
       </div>
     </div>
   </footer>
-  <div class="static-preview-banner"><strong>Static browser preview:</strong> Das ist eine dauerhaft erreichbare Vorschau der Website. Login, Dashboard, Command Center und Zahlungen laufen nur in der Live-App/Deployment.</div><script>
+  <script>
 (() => {
   const toggle = document.querySelector('[data-menu-toggle]');
   const menu = document.querySelector('[data-menu]');

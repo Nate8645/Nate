@@ -107,6 +107,7 @@ function renderPage(req, { title, description = 'AI launch workspace for founder
         ${navLink(currentPath, '/', 'Home')}
         ${navLink(currentPath, '/product', 'Product')}
         ${navLink(currentPath, '/features', 'Features')}
+        ${navLink(currentPath, '/trust-center', 'Trust')}
         ${navLink(currentPath, '/about', 'About')}
         ${navLink(currentPath, '/pricing', 'Pricing')}
         ${navLink(currentPath, '/demo', 'Demo')}
@@ -142,6 +143,9 @@ function renderPage(req, { title, description = 'AI launch workspace for founder
       </div>
       <div>
         <span class="footer-title">Trust</span>
+        <a href="/trust-center">Security & transparency</a>
+        <a href="/privacy">Privacy policy</a>
+        <a href="/terms">Terms</a>
         <p>No fake revenue, no hidden spend, no API keys in code. Stripe and LLMs are configured with environment variables.</p>
       </div>
     </div>
@@ -177,19 +181,19 @@ function heroPage(req) {
       <div class="hero-noise" aria-hidden="true"></div>
       <div class="container hero-grid premium-hero-grid">
         <div class="hero-copy reveal">
-          <p class="eyebrow glow-label">AI Launch Operating System</p>
-          <h1><span class="text-gradient">From offer idea</span> to sellable launch motion.</h1>
-          <p class="hero-subtitle">UltraLaunch AI turns one rough brief into premium positioning, pricing, landing copy, outreach scripts, content angles, support flows, usage tracking, and a revenue-ready dashboard.</p>
+          <p class="eyebrow glow-label">Trusted AI Launch Operating System</p>
+          <h1><span class="text-gradient">Turn a rough offer</span> into a visible, permission-controlled launch machine.</h1>
+          <p class="hero-subtitle">UltraLaunch AI is for founders, agencies, consultants, and ecommerce operators who need ICP, positioning, pricing, landing copy, outreach, sales scripts, support flows, and a 24-hour execution plan — with transparent AI actions, human approvals, privacy controls, and no fabricated proof.</p>
           <div class="hero-actions">
             <a class="btn magnetic" href="/register">Generate my free kit</a>
-            <a class="btn btn-secondary magnetic" href="/product">Explore product</a>
-            <a class="btn btn-ghost" href="/watch-demo.html">Watch walkthrough</a>
+            <a class="btn btn-secondary magnetic" href="/trust-center">Review trust model</a>
+            <a class="btn btn-ghost" href="/product">Explore product</a>
           </div>
           <div class="trust-row premium-trust" aria-label="Product proof points">
-            <span>No-card free workspace</span>
-            <span>Stripe-ready billing</span>
-            <span>$199 concierge sprint</span>
-            <span>No fake revenue claims</span>
+            <span>Human approval for critical actions</span>
+            <span>Activity logs + data export</span>
+            <span>Env-driven secrets</span>
+            <span>No fake customers or revenue</span>
           </div>
         </div>
         <div class="hero-stage reveal" aria-label="Premium product visual">
@@ -203,6 +207,9 @@ function heroPage(req) {
         <span>Solo founders</span><span>AI agencies</span><span>Consultants</span><span>Shopify operators</span><span>Product marketers</span><span>Sales teams</span>
       </div>
     </section>
+
+    ${trustSnapshotSection()}
+    ${aiActionCenterPreviewSection()}
 
     <section class="section story-section">
       <div class="container narrative-grid">
@@ -292,6 +299,109 @@ function storyPanel(number, title, body, tone = 'primary') {
 
 function proofCard(title, body) {
   return `<article class="proof-card reveal"><span class="placeholder-tag">Verified-data slot</span><h3>${e(title)}</h3><p>${e(body)}</p></article>`;
+}
+
+
+function trustSnapshotSection() {
+  const items = [
+    ['Security', 'Critical computer, payment, terminal, and connected-account actions require approval by default.'],
+    ['Privacy', 'Secrets stay in environment variables. Users can inspect memory and export/delete account data.'],
+    ['Permissions', 'Each agent has ALLOW / ASK / DENY controls for tools such as browser, files, APIs, payments, and desktop.'],
+    ['Activity logs', 'The platform records AI tasks, approvals, integration checks, security changes, and billing events.'],
+  ];
+  return `<section class="section trust-snapshot-section">
+    <div class="container">
+      ${sectionHeader('Trust-first product', 'You always see what the AI can do, what it did, and what needs approval.', 'UltraLaunch AI is positioned as a premium business system, but it stays honest: prepared integrations are labeled as prepared, secrets are not stored in code, and risky actions stop at the approval gate.')}
+      <div class="trust-snapshot-grid">${items.map(([title, body]) => `<article class="trust-snapshot-card reveal"><span class="icon-dot"></span><h3>${e(title)}</h3><p>${e(body)}</p></article>`).join('')}</div>
+      <div class="trust-mini-cta reveal"><span>Transparent AI policy:</span><strong>WHAT · WHY · DATA USED · TOOL · EXPECTED RESULT · RISK · APPROVE / DENY</strong><a class="text-link" href="/trust-center">Open Trust Center →</a></div>
+    </div>
+  </section>`;
+}
+
+function aiActionCenterPreviewSection() {
+  const agents = [
+    ['Marketing Agent', 'Drafts SEO angles and launch posts', 'Uses offer brief + approved memory', 'ASK before publishing'],
+    ['Developer Agent', 'Plans integrations and checks routes', 'Uses repo inventory + test output', 'ASK before deploy actions'],
+    ['Research Agent', 'Compares positioning and buyer objections', 'Uses public web/repo notes when enabled', 'Read-only by default'],
+    ['Support Agent', 'Prepares help replies and ticket summaries', 'Uses tickets + account context', 'ASK before sending'],
+  ];
+  return `<section class="section action-center-preview muted">
+    <div class="container split premium-split">
+      <div class="reveal">
+        <p class="eyebrow">AI Action Center</p>
+        <h2>Agents work visibly — not behind a black box.</h2>
+        <p class="muted-text">Customers can inspect every task, permission, data source, and approval request before the AI touches external systems or sensitive workflows.</p>
+        <a class="btn btn-secondary" href="/register">Try the command center</a>
+      </div>
+      <div class="action-center-board reveal" aria-label="AI Action Center preview">
+        ${agents.map(([name, task, data, policy], index) => `<article class="action-agent-row"><div><span class="status-dot ${index === 0 ? 'live' : ''}"></span><strong>${e(name)}</strong><p>${e(task)}</p></div><small>${e(data)}</small><em>${e(policy)}</em></article>`).join('')}
+      </div>
+    </div>
+  </section>`;
+}
+
+function publicTrustPage(req) {
+  const controls = [
+    ['Security', 'Rate limits, CSRF protection, secure headers, password hashing, env-driven secrets, verified Stripe webhooks, and local audit logs.'],
+    ['Privacy', 'Account data, launch briefs, generated kits, memories, tasks, approvals, and billing metadata are treated as customer data. Secrets are not committed or shown in chat.'],
+    ['Permissions', 'Agents receive least-privilege capability sets. Browser, desktop, files, terminal, connected apps, and payments can be allowed, denied, or set to ask.'],
+    ['Data controls', 'Users can view AI memory, export trust data as JSON, and delete account-owned records through trust routes.'],
+    ['Activity logs', 'AI commands, approvals, integration checks, permission changes, billing events, and security settings are visible in audit history.'],
+    ['Human control', 'The kill switch pauses active AI action planning. Critical actions explain WHAT, WHY, DATA USED, TOOL, EXPECTED RESULT, and RISK before approval.'],
+    ['Support', 'Authenticated users can open support tickets. Public contact is available for pre-sale questions.'],
+    ['Clear pricing', 'Free, subscription, and one-time concierge sprint pricing are public. Stripe is required for real checkout and must be configured manually.'],
+  ];
+  return renderPage(req, {
+    title: 'Security, Privacy, and AI Trust Center',
+    active: '/trust-center',
+    description: 'UltraLaunch AI trust center explaining security, privacy, permissions, data controls, activity logs, AI transparency, support, pricing, terms, and human control.',
+    content: `<section class="page-hero trust-hero premium-page"><div class="container hero-grid premium-hero-grid"><div class="reveal"><p class="eyebrow">Trust Center</p><h1>Premium AI, controlled by the customer.</h1><p>UltraLaunch AI explains what data it uses, what tools it can access, what can be automatic, when it must ask, how to stop it, and how to remove data. We do not show fake certifications, fake customers, or fake revenue.</p><div class="hero-actions"><a class="btn" href="/register">Create workspace</a><a class="btn btn-secondary" href="/privacy">Read privacy policy</a><a class="btn btn-ghost" href="/terms">Read terms</a></div></div><div class="trust-panel reveal"><h2>Critical-action explainer</h2><dl><dt>WHAT</dt><dd>Prepare GitHub deployment checklist</dd><dt>WHY</dt><dd>Launch readiness requires repeatable release steps</dd><dt>DATA USED</dt><dd>Repo files, tests, env readiness status</dd><dt>TOOL</dt><dd>Developer agent + local test runner</dd><dt>RISK</dt><dd>ASK before push/deploy/payment/external send</dd></dl><span class="status-pill">Approve / Deny gate</span></div></div></section>
+    <section class="section"><div class="container"><div class="trust-control-grid">${controls.map(([title, body]) => `<article class="trust-control-card reveal"><h2>${e(title)}</h2><p>${e(body)}</p></article>`).join('')}</div></div></section>
+    ${aiActionCenterPreviewSection()}
+    <section class="section"><div class="container split premium-split"><div class="reveal"><p class="eyebrow">Transparency details</p><h2>What the AI can and cannot do.</h2><p class="muted-text">Today the product can generate launch kits, create tasks, prepare approval cards, manage local permissions, index knowledge notes, and show prepared integration states. External connectors such as GitHub, Shopify, Google, and Stripe require official credentials before live actions.</p></div><div class="card-grid two-col"><article class="card"><h3>Automatic</h3><p>Drafting, internal summaries, local task creation, memory suggestions, diagnostics, and first-party analytics summaries when permissions allow.</p></article><article class="card"><h3>Requires approval</h3><p>Publishing, payments, file deletion, terminal commands, deployments, connected-account writes, external messages, and any critical-risk action.</p></article><article class="card"><h3>Kill switch</h3><p>Security Center can stop active AI action planning and force human review of future critical operations.</p></article><article class="card"><h3>Deletion/export</h3><p>Trust Center exposes export/delete paths for account-owned records and transparent activity history.</p></article></div></div></section>`,
+  });
+}
+
+function privacyPage(req) {
+  return renderPage(req, {
+    title: 'Privacy Policy',
+    active: '/privacy',
+    description: 'Privacy policy for UltraLaunch AI describing customer data, AI usage, connected apps, security, retention, export, and deletion.',
+    content: `<section class="page-hero premium-page"><div class="container"><p class="eyebrow">Privacy Policy</p><h1>Your launch data should be useful, visible, and controllable.</h1><p>Last updated: 2026-08-24. This is a product transparency policy, not legal advice. Final production launch should be reviewed by counsel for the operating company and jurisdictions served.</p></div></section>
+    <section class="section"><div class="container legal-doc card"><h2>Data we process</h2><p>Account details, launch briefs, generated kits, plans, usage events, support tickets, AI tasks, approval records, permissions, memories, knowledge notes, and billing metadata from Stripe when configured.</p><h2>AI and providers</h2><p>The app can run deterministic fallback generation locally. If an external OpenAI-compatible provider is configured through environment variables, prompts needed for generation may be sent to that provider according to its terms.</p><h2>Connected apps</h2><p>GitHub, Shopify, Google, Slack, CRM, cloud, and similar integrations are prepared but not live unless connected through official credentials. Secrets must be stored in environment variables or future encrypted secret storage, never in source code.</p><h2>Controls</h2><p>Customers can inspect memory, activity logs, permissions, approvals, sessions, and diagnostics. Export/delete controls are available in the authenticated Trust Center.</p><h2>Retention and deletion</h2><p>Data is retained while an account is active or needed for security, billing, support, and legal requirements. Deletion workflows remove account-owned app records where technically and legally possible.</p><h2>Contact</h2><p>Questions: <a href="/contact">contact the team</a>.</p></div></section>`,
+  });
+}
+
+function termsPage(req) {
+  return renderPage(req, {
+    title: 'Terms of Service',
+    active: '/terms',
+    description: 'Terms for UltraLaunch AI covering acceptable use, AI outputs, payments, connected apps, permissions, and customer responsibility.',
+    content: `<section class="page-hero premium-page"><div class="container"><p class="eyebrow">Terms of Service</p><h1>Clear rules for a permission-controlled AI launch workspace.</h1><p>Last updated: 2026-08-24. This draft is for product transparency and should be reviewed by counsel before production launch.</p></div></section>
+    <section class="section"><div class="container legal-doc card"><h2>Service</h2><p>UltraLaunch AI helps customers generate launch strategy, positioning, pricing, copy, content, outreach scripts, tasks, approvals, and operating dashboards.</p><h2>No guarantees</h2><p>The product does not guarantee revenue, customers, ad performance, compliance outcomes, or funding. Outputs are drafts and decisions remain the customer’s responsibility.</p><h2>Acceptable use</h2><p>Do not use the service for unlawful activity, deception, spam, credential theft, bypassing security controls, fake proof, impersonation, or unauthorized automation.</p><h2>AI actions and permissions</h2><p>Critical actions require human approval. Customers are responsible for reviewing external sends, payments, deployments, connected-app changes, and generated business claims.</p><h2>Payments</h2><p>Subscriptions and one-time sprint purchases are processed by Stripe when configured. Refund/cancellation rules should be finalized before public launch.</p><h2>Customer content</h2><p>Customers retain ownership of their submitted content and are responsible for having rights to use it. Generated outputs should be reviewed for accuracy and compliance.</p><h2>Contact</h2><p>Questions: <a href="/contact">contact the team</a>.</p></div></section>`,
+  });
+}
+
+function developerToolsPage(req, { audit }) {
+  const byType = audit.records.reduce((groups, item) => {
+    groups[item.type] = groups[item.type] || [];
+    groups[item.type].push(item);
+    return groups;
+  }, {});
+  const compatibilityLabel = (value) => value.replaceAll('_', ' ');
+  return renderPage(req, {
+    title: 'GitHub Skills and Plugin Integration Audit',
+    active: '/developer-tools',
+    footerCta: false,
+    description: 'Repository extension audit for Claude skills, plugins, agents, commands, MCP configuration, scripts, workflows, compatibility, safety, permissions, and business value.',
+    content: `<section class="dashboard-hero premium-page"><div class="container dashboard-head"><div><p class="eyebrow">GitHub Skills + Plugin Integration</p><h1>Repository extensions audited before use.</h1><p>Scanned Claude skills, plugin manifests, agent instructions, commands, scripts, workflows, and MCP indicators. Compatible assets are connected as playbooks and least-privilege agent bindings — not blindly installed or executed.</p></div><a class="btn btn-secondary" href="/permissions">Review permissions</a></div></section>
+    <section class="section"><div class="container stack"><div class="metric-grid">${metric('Extensions scanned', audit.summary.total)}${metric('Integrated adapters', audit.summary.integrated)}${metric('Adapter-only assets', audit.summary.adapters)}${metric('Not present / skipped', audit.summary.notPresent)}</div>
+      <div class="card"><h2>Integration policy</h2><ul>${audit.integrationPolicy.map((item) => `<li>${e(item)}</li>`).join('')}</ul></div>
+      <div class="card table-card"><h2>Least-privilege agent bindings</h2>${table(['UltraLaunch agent','Imported sources','Allowed use'], audit.bindings.map((binding) => [binding.agentKey, binding.sources.join(', '), binding.tools.join(' · ')]))}</div>
+      ${Object.entries(byType).map(([type, records]) => `<div class="card table-card"><h2>${e(type.replaceAll('_', ' '))}</h2>${table(['Name','Compatibility','Dependencies','Permissions / APIs','Business value'], records.map((record) => [record.name, compatibilityLabel(record.compatibility), record.dependencies.join(' · '), [...record.permissions, ...record.apis].join(' · ') || 'None', record.value]))}</div>`).join('')}
+      <div class="admin-grid"><div class="card"><h2>Benötigte Environment Variables</h2><ul>${audit.neededEnvironment.map(([key, detail]) => `<li><strong>${e(key)}</strong> — ${e(detail)}</li>`).join('')}</ul></div><div class="card"><h2>Kompatibilitätsprobleme</h2><ul><li>No MCP server config exists in this branch, so no live MCP is claimed.</li><li>GitHub Actions are intentionally absent until workflow permissions are available.</li><li>Claude slash commands are Claude Code assets; the SaaS uses them as documented playbooks, not direct browser-executable commands.</li><li>The historical plugin README/settings referenced a likely owner typo; documentation now points to the active GitHub source.</li></ul></div></div>
+    </div></section>`,
+  });
 }
 
 function productPage(req) {
@@ -906,6 +1016,9 @@ module.exports = {
   renderPage,
   heroPage,
   productPage,
+  publicTrustPage,
+  privacyPage,
+  termsPage,
   featuresPage,
   pricingPage,
   pilotPage,
@@ -926,6 +1039,7 @@ module.exports = {
   securityPage,
   analyticsPage,
   marketplacePage,
+  developerToolsPage,
   permissionsPage,
   computerPage,
   mobileCommandPage,

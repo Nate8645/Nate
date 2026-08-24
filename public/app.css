@@ -724,3 +724,31 @@ body::before {
 .automation-step-form { display: grid; grid-template-columns: 130px 190px minmax(220px, 1fr) 120px auto; gap: 8px; align-items: center; }
 .mobile-command .mini-link-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 900px) { .automation-step-form { grid-template-columns: 1fr; } .mobile-command .mini-link-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Trust-first customer experience + GitHub skills audit */
+.trust-snapshot-section { position: relative; }
+.trust-snapshot-grid, .trust-control-grid { display: grid; grid-template-columns: repeat(4, minmax(190px, 1fr)); gap: 16px; }
+.trust-snapshot-card, .trust-control-card, .trust-panel, .action-center-board { border: 1px solid rgba(145,255,240,.18); border-radius: 28px; background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.04)); box-shadow: 0 28px 90px rgba(0,0,0,.18); padding: 24px; }
+.trust-snapshot-card p, .trust-control-card p { color: var(--muted); }
+.trust-mini-cta { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px 18px; border: 1px solid rgba(255,255,255,.13); border-radius: 22px; background: rgba(255,255,255,.055); }
+.trust-mini-cta span { color: var(--muted); font-weight: 850; }
+.trust-mini-cta strong { color: #91fff0; letter-spacing: .05em; font-size: .85rem; }
+.trust-mini-cta a { margin-left: auto; }
+.action-center-board { display: grid; gap: 12px; }
+.action-agent-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(150px, .65fr) minmax(110px, .45fr); gap: 12px; align-items: center; padding: 14px; border-radius: 18px; background: rgba(7,9,20,.35); border: 1px solid rgba(255,255,255,.1); }
+.action-agent-row div { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; }
+.action-agent-row p { grid-column: 2; margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.action-agent-row small { color: #c7cdec; }
+.action-agent-row em { justify-self: end; font-style: normal; color: #91fff0; font-weight: 900; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 rgba(145,255,240,0); }
+.status-dot.live { background: #91fff0; animation: trustPulse 1.8s ease-in-out infinite; }
+@keyframes trustPulse { 50% { box-shadow: 0 0 0 9px rgba(145,255,240,.09); } }
+.trust-panel dl { display: grid; grid-template-columns: 120px 1fr; gap: 10px 14px; margin: 18px 0; }
+.trust-panel dt { color: #91fff0; font-weight: 950; letter-spacing: .1em; font-size: .78rem; }
+.trust-panel dd { margin: 0; color: var(--muted); }
+.legal-doc { max-width: 940px; margin-inline: auto; }
+.legal-doc h2 { margin-top: 28px; }
+.legal-doc h2:first-child { margin-top: 0; }
+.legal-doc p { color: var(--muted); }
+@media (max-width: 1120px) { .trust-snapshot-grid, .trust-control-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .action-agent-row { grid-template-columns: 1fr; } .action-agent-row em { justify-self: start; } .trust-mini-cta a { margin-left: 0; } }
+@media (max-width: 720px) { .trust-snapshot-grid, .trust-control-grid, .trust-panel dl { grid-template-columns: 1fr; } .trust-mini-cta { align-items: flex-start; } }

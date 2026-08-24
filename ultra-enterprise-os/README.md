@@ -42,7 +42,7 @@ produktionsreife Endergebnis wird ausgeliefert.
 Dieses Repo ist gleichzeitig ein Plugin-Marketplace. In Claude Code:
 
 ```
-/plugin marketplace add Nate8645er/Nate
+/plugin marketplace add Nate8645/Nate
 /plugin install ultra-enterprise-os@nate-marketplace
 ```
 

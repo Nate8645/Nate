@@ -12,6 +12,7 @@ const { stripeClient, createCheckoutSession, createPilotCheckoutSession, createP
 const { launchReadiness } = require('./launch-readiness');
 const { ensureTrustDefaults, logAction, upsertMemory, userTrustSnapshot, agentWorkspace, createAgentTask, exportUserData, permissionCatalog } = require('./intelligence');
 const { commandCenterSnapshot, orchestrateCommand, integrationSnapshot, installIntegration, testIntegration, disconnectIntegration, projectsSnapshot, createProject, createKnowledgeSource, memorySnapshot, createMemory, securitySnapshot, setKillSwitch, decideApproval, analyticsSnapshot, marketplaceSnapshot, tasksSnapshot, permissionMatrixSnapshot, updateAgentPermissionRule, automationBuilderSnapshot, addAutomationStep, computerSnapshot, createComputerActionApproval, mobileSnapshot, voiceSnapshot, createAiEmployee } = require('./platform');
+const { repositoryExtensionAudit } = require('./repository-intelligence');
 const views = require('./views');
 
 function createApp(options = {}) {
@@ -84,6 +85,9 @@ function createApp(options = {}) {
   });
   app.get('/use-cases', (req, res) => res.send(views.useCasesPage(req)));
   app.get('/faq', (req, res) => res.send(views.faqPage(req)));
+  app.get('/trust-center', (req, res) => res.send(views.publicTrustPage(req)));
+  app.get('/privacy', (req, res) => res.send(views.privacyPage(req)));
+  app.get('/terms', (req, res) => res.send(views.termsPage(req)));
 
   app.get('/contact', (req, res) => res.send(views.contactPage(req)));
   app.post('/contact', rateLimit({ windowMs: 15 * 60 * 1000, max: 6, prefix: 'contact' }), (req, res) => {
@@ -319,6 +323,10 @@ function createApp(options = {}) {
 
   app.get('/marketplace', requireAuth, (req, res) => {
     res.send(views.marketplacePage(req, { snapshot: marketplaceSnapshot(db, req.user.id) }));
+  });
+
+  app.get('/developer-tools', requireAuth, (req, res) => {
+    res.send(views.developerToolsPage(req, { audit: repositoryExtensionAudit() }));
   });
 
   app.post('/employees', requireAuth, (req, res) => {
@@ -667,7 +675,7 @@ function createApp(options = {}) {
 
   app.get('/sitemap.xml', (req, res) => {
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-    const paths = ['/', '/product', '/features', '/about', '/pricing', '/demo', '/pilot', '/use-cases', '/faq', '/contact', '/login', '/register'];
+    const paths = ['/', '/product', '/features', '/about', '/pricing', '/demo', '/pilot', '/use-cases', '/faq', '/trust-center', '/privacy', '/terms', '/contact', '/login', '/register'];
     res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${paths.map((p) => `<url><loc>${base}${p}</loc></url>`).join('')}</urlset>`);
   });
 

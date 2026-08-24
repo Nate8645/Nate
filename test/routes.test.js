@@ -31,7 +31,23 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
   try {
     let res = await request('/');
     assert.equal(res.status, 200);
-    assert.match(await res.text(), /AI Launch Operating System/);
+    const homeHtml = await res.text();
+    assert.match(homeHtml, /Trusted AI Launch Operating System/);
+    assert.match(homeHtml, /AI Action Center/);
+
+    res = await request('/trust-center');
+    const publicTrustHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(publicTrustHtml, /Security, Privacy, and AI Trust Center/);
+    assert.match(publicTrustHtml, /Critical-action explainer/);
+
+    res = await request('/privacy');
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /Privacy Policy/);
+
+    res = await request('/terms');
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /Terms of Service/);
 
     res = await request('/register');
     const registerHtml = await res.text();
@@ -204,6 +220,13 @@ test('core SaaS flow: home, register, dashboard, generate kit, admin', async () 
     assert.equal(res.status, 200);
     assert.match(marketplaceHtml, /AI Agent Marketplace/);
     assert.match(marketplaceHtml, /CEO Agent/);
+
+    res = await request('/developer-tools');
+    const developerToolsHtml = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(developerToolsHtml, /GitHub Skills \+ Plugin Integration/);
+    assert.match(developerToolsHtml, /Least-privilege agent bindings/);
+    assert.match(developerToolsHtml, /MCP configurations/);
 
     res = await request('/permissions');
     const permissionsHtml = await res.text();

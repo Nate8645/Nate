@@ -100,10 +100,13 @@ No Stripe secrets are committed. To accept real payments:
 npm test
 npm run lint
 npm run repo:audit
+npm run static:build
 npm run launch:check
 ```
 
 `npm run repo:audit` prints the same Claude Skills / plugin / agent / MCP / script inventory that is visible in the authenticated `/developer-tools` page and downloadable at `/developer-tools/audit.json`.
+
+`npm run static:build` regenerates the public static browser preview in `docs/` for GitHub Pages and `public/static-website-preview.html`. The static preview does not fake live auth, billing, AI generation, or connector actions.
 
 `npm run launch:check` intentionally exits non-zero until production secrets, Stripe prices, webhook secret, and HTTPS `APP_URL` are configured.
 

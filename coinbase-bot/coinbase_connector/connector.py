@@ -74,13 +74,56 @@ class CoinbaseLiveConnector:
                 return accounts
             cursor = page.get("cursor")
 
-    def get_available_funds(self, currency: str) -> Decimal:
-        """Spendable amount of one currency (funds held by open orders excluded)."""
+    def get_available_funds(
+        self, currency: str, portfolio_only: bool = True
+    ) -> Decimal:
+        """Spendable amount of one currency (funds held by open orders excluded).
+
+        Per the spec, each Account carries ``retail_portfolio_id``; with
+        ``portfolio_only`` (the default) only accounts belonging to the key's
+        own portfolio are counted, so funds in any other portfolio are never
+        treated as spendable - a second guard on portfolio isolation beyond the
+        key's own ``portfolio_uuid``."""
+        own = self.permissions.get("portfolio_uuid")
         total = Decimal("0")
         for account in self.get_real_balance():
-            if account.get("currency") == currency.upper():
-                total += Decimal(account["available_balance"]["value"])
+            if account.get("currency") != currency.upper():
+                continue
+            if (
+                portfolio_only
+                and own
+                and account.get("retail_portfolio_id") not in (own, None)
+            ):
+                continue
+            total += Decimal(account["available_balance"]["value"])
         return total
+
+    def assert_portfolio_isolation(self) -> dict:
+        """Prove the key can only see its own portfolio. Reads every account
+        (spec field ``retail_portfolio_id``) and confirms none belongs to a
+        different portfolio than the key's ``portfolio_uuid``. Raises on any
+        foreign account; returns a summary otherwise. Read-only."""
+        own = self.permissions.get("portfolio_uuid")
+        if not own:
+            raise ConnectorError(
+                "API key reports no portfolio_uuid; isolation unverifiable."
+            )
+        foreign, seen = [], set()
+        for account in self.get_real_balance():
+            pid = account.get("retail_portfolio_id")
+            if pid is not None:
+                seen.add(pid)
+                if pid != own:
+                    foreign.append(
+                        {"currency": account.get("currency"), "portfolio": pid}
+                    )
+        if foreign:
+            raise ConnectorError(f"Key sees foreign-portfolio accounts: {foreign}")
+        return {
+            "portfolio_uuid": own,
+            "portfolios_seen": sorted(seen),
+            "cannot_transfer": not self.permissions.get("can_transfer"),
+        }
 
     def get_market_price(self, product_id: str) -> dict:
         books = _as_dict(self._client.get_best_bid_ask(product_ids=[product_id]))
@@ -113,6 +156,45 @@ class CoinbaseLiveConnector:
         )
 
     @staticmethod
+    def preview_metrics(preview: dict) -> dict:
+        """Coinbase's own figures from an OrderPreviewResponse (spec fields):
+        order_total, commission_total, slippage (percent), best_bid, best_ask.
+        Missing fields come back as None - never guessed. These are more exact
+        than approximating slippage/fees from a separate quote."""
+
+        def dec(key):
+            v = preview.get(key)
+            try:
+                return Decimal(str(v)) if v is not None and v != "" else None
+            except Exception:  # noqa: BLE001
+                return None
+
+        return {
+            "order_total": dec("order_total"),
+            "commission_total": dec("commission_total"),
+            "slippage_pct": dec("slippage"),
+            "best_bid": dec("best_bid"),
+            "best_ask": dec("best_ask"),
+            "preview_id": preview.get("preview_id"),
+        }
+
+    @staticmethod
+    def error_detail(exc: Exception) -> dict:
+        """Best-effort extraction of the spec error shape {error, code, message,
+        details} from an SDK exception, for logging. Never raises."""
+        out = {"type": type(exc).__name__, "text": str(exc)[:300]}
+        body = getattr(exc, "response", None)
+        for attr in ("error", "code", "message"):
+            val = getattr(exc, attr, None)
+            if val is not None:
+                out[attr] = val
+        if isinstance(body, dict):
+            for k in ("error", "code", "message"):
+                if k in body:
+                    out[k] = body[k]
+        return out
+
+    @staticmethod
     def _preview(response: Any) -> dict:
         preview = _as_dict(response)
         if preview.get("errs"):
@@ -124,27 +206,94 @@ class CoinbaseLiveConnector:
     def get_real_order_status(self, order_id: str) -> dict:
         return _as_dict(self._client.get_order(order_id))["order"]
 
+    def _portfolio_scope(self) -> dict:
+        """Spec: list_orders and fills accept ``retail_portfolio_id``. Scope
+        every order/fill query to the key's own portfolio."""
+        own = self.permissions.get("portfolio_uuid")
+        return {"retail_portfolio_id": own} if own else {}
+
+    def _paged_orders(self, max_pages: int = 10, **params) -> list[dict]:
+        """Follow the spec's ``cursor`` / ``has_next`` pagination."""
+        orders: list[dict] = []
+        cursor = None
+        for _ in range(max_pages):
+            page = _as_dict(
+                self._client.list_orders(
+                    cursor=cursor, **self._portfolio_scope(), **params
+                )
+            )
+            orders.extend(page.get("orders") or [])
+            cursor = page.get("cursor")
+            if not page.get("has_next") or not cursor:
+                break
+        return orders
+
     def get_open_orders(self) -> list[dict]:
-        """Resting orders of the key's portfolio."""
-        return (
-            _as_dict(self._client.list_orders(order_status=["OPEN"])).get("orders")
-            or []
-        )
+        """Resting orders of the key's own portfolio (all pages)."""
+        return self._paged_orders(order_status=["OPEN"])
 
     def find_order_by_client_id(
-        self, client_order_id: str, limit: int = 100
+        self, client_order_id: str, limit: int = 100, max_pages: int = 10
     ) -> dict | None:
         """Look an order up by the id WE chose. Used after a restart or a
-        timeout to learn whether an order reached Coinbase. None = Coinbase
-        does not list it among the most recent orders."""
-        orders = _as_dict(self._client.list_orders(limit=limit)).get("orders") or []
-        for order in orders:
+        timeout to learn whether an order reached Coinbase. Searches the own
+        portfolio across up to ``max_pages`` pages. None = not found there."""
+        for order in self._paged_orders(max_pages=max_pages, limit=limit):
             if order.get("client_order_id") == client_order_id:
                 return order
         return None
 
     def get_real_fills(self, order_id: str) -> list[dict]:
-        return _as_dict(self._client.get_fills(order_ids=[order_id])).get("fills") or []
+        """All fills of one order (spec: Fill.price, size, commission)."""
+        fills: list[dict] = []
+        cursor = None
+        for _ in range(10):
+            page = _as_dict(
+                self._client.get_fills(
+                    order_ids=[order_id], cursor=cursor, **self._portfolio_scope()
+                )
+            )
+            fills.extend(page.get("fills") or [])
+            cursor = page.get("cursor")
+            if not cursor:
+                break
+        return fills
+
+    def reconcile_fills(self, order_id: str) -> dict:
+        """Cross-check an order against its fills (spec fields). The order's
+        filled_size and total_fees must equal the sum over its fills; a
+        mismatch is reported, never silently accepted."""
+        order = self.get_real_order_status(order_id)
+        fills = self.get_real_fills(order_id)
+
+        def base_size(f):
+            # Spec Fill.size_in_quote: a quote-sized order (e.g. a USDC-amount
+            # market buy) reports fill size in QUOTE currency. Convert with the
+            # fill price; summing raw sizes would mix USDC and BTC.
+            raw = Decimal(str(f.get("size") or "0"))
+            if f.get("size_in_quote") in (True, "true", "True"):
+                price = Decimal(str(f.get("price") or "0"))
+                return raw / price if price > 0 else Decimal("0")
+            return raw
+
+        size = sum((base_size(f) for f in fills), Decimal("0"))
+        fees = sum(
+            (Decimal(str(f.get("commission") or "0")) for f in fills), Decimal("0")
+        )
+        o_size = Decimal(str(order.get("filled_size") or "0"))
+        o_fees = Decimal(str(order.get("total_fees") or "0"))
+        tol = Decimal("0.00000001")
+        return {
+            "order_id": order_id,
+            "status": order.get("status"),
+            "fills": len(fills),
+            "fill_size": str(size),
+            "order_filled_size": str(o_size),
+            "fill_fees": str(fees),
+            "order_total_fees": str(o_fees),
+            "match": abs(size - o_size) <= tol
+            and abs(fees - o_fees) <= Decimal("0.000001"),
+        }
 
     # ---- real money ------------------------------------------------------
 
@@ -278,7 +427,10 @@ class CoinbaseLiveConnector:
         step(
             "order_history",
             lambda: len(
-                _as_dict(self._client.list_orders(limit=25)).get("orders") or []
+                _as_dict(
+                    self._client.list_orders(limit=25, **self._portfolio_scope())
+                ).get("orders")
+                or []
             ),
         )
         step(
@@ -289,6 +441,14 @@ class CoinbaseLiveConnector:
         isolated = bool(portfolio) and (
             expected_portfolio_id is None or portfolio == expected_portfolio_id
         )
+        # Second, stronger proof: no account belongs to a foreign portfolio
+        # (spec field Account.retail_portfolio_id).
+        try:
+            report["checks"]["isolation_proof"] = self.assert_portfolio_isolation()
+        except Exception as exc:  # noqa: BLE001
+            report["errors"].append(f"isolation: {type(exc).__name__}: {exc}")
+            report["checks"]["isolation_proof"] = None
+            isolated = False
         report["checks"]["portfolio_isolated"] = isolated
         report["checks"]["cannot_transfer"] = not perms.get("can_transfer")
         report["ok"] = (

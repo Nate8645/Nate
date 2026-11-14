@@ -264,9 +264,29 @@ def run_cycle(
         return finish(
             f"BLOCKIERT: Vorschau fehlgeschlagen ({type(exc).__name__}: {exc})"
         )
-    slippage = _slippage_pct(quote, "BUY")
+    # Prefer Coinbase's own slippage/commission from the preview (spec:
+    # OrderPreviewResponse.slippage / commission_total); fall back to the
+    # bid/ask approximation only when the preview does not carry it.
+    metrics = {}
+    getter = getattr(connector, "preview_metrics", None)
+    if callable(getter):
+        try:
+            metrics = getter(preview)
+        except Exception:  # noqa: BLE001
+            metrics = {}
+    slippage = metrics.get("slippage_pct")
+    slippage_source = "preview"
+    if slippage is None:
+        slippage = _slippage_pct(quote, "BUY")
+        slippage_source = "quote"
     out["steps"]["preview"] = {
         "slippage_pct": None if slippage is None else str(slippage),
+        "slippage_source": slippage_source,
+        "commission_total": (
+            None
+            if metrics.get("commission_total") is None
+            else str(metrics["commission_total"])
+        ),
         "preview_keys": sorted(preview)[:12],
     }
 

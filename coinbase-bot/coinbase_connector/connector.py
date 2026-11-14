@@ -126,9 +126,14 @@ class CoinbaseLiveConnector:
 
     def get_open_orders(self) -> list[dict]:
         """Resting orders of the key's portfolio."""
-        return _as_dict(self._client.list_orders(order_status=["OPEN"])).get("orders") or []
+        return (
+            _as_dict(self._client.list_orders(order_status=["OPEN"])).get("orders")
+            or []
+        )
 
-    def find_order_by_client_id(self, client_order_id: str, limit: int = 100) -> dict | None:
+    def find_order_by_client_id(
+        self, client_order_id: str, limit: int = 100
+    ) -> dict | None:
         """Look an order up by the id WE chose. Used after a restart or a
         timeout to learn whether an order reached Coinbase. None = Coinbase
         does not list it among the most recent orders."""
@@ -182,6 +187,118 @@ class CoinbaseLiveConnector:
         if not results or not results[0].get("success"):
             raise ConnectorError(f"Cancel failed for {order_id}: {results}")
         return results[0]
+
+    # ---- limit exits -----------------------------------------------------
+    # The SDK exposes market, limit (GTC/GTD/IOC/FOK), stop-limit and
+    # trigger-bracket orders. We use a market exit by default (certain to
+    # flatten) and a GTC limit exit when a worse-than-limit fill must be
+    # avoided. NONE of these guarantees an execution price; see
+    # supported_order_types().
+
+    def preview_limit_sell(
+        self, product_id: str, base_size: str, limit_price: str
+    ) -> dict:
+        return self._preview(
+            self._client.preview_limit_order_gtc_sell(
+                product_id, base_size=base_size, limit_price=limit_price
+            )
+        )
+
+    def execute_real_limit_sell(
+        self,
+        product_id: str,
+        base_size: str,
+        limit_price: str,
+        client_order_id: str,
+        confirmation: str,
+    ) -> dict:
+        self._require_approval("SELL", product_id, base_size, confirmation)
+        if not self.permissions.get("can_trade"):
+            raise ConnectorError("API key has no trade permission.")
+        return self._created(
+            self._client.limit_order_gtc_sell(
+                client_order_id,
+                product_id,
+                base_size=base_size,
+                limit_price=limit_price,
+            )
+        )
+
+    @staticmethod
+    def supported_order_types() -> dict:
+        """What Coinbase Advanced Trade really offers for spot, and the honest
+        guarantee of each. A stop order is a trigger to SEND an order, not a
+        promise about the fill price: in a fast move the market can gap through
+        the stop and fill worse, and a stop-LIMIT can fail to fill at all."""
+        return {
+            "market": "fills immediately at the best available price; no price guarantee",
+            "limit_gtc": "rests until filled or cancelled; fills only at the limit or better",
+            "limit_gtd": "limit with an expiry time",
+            "limit_ioc/fok": "fill now or cancel (partial / all-or-none)",
+            "stop_limit": "trigger places a LIMIT order; may NOT fill if price gaps past it",
+            "trigger_bracket": "take-profit + stop-loss bracket; same no-guarantee caveat",
+            "guarantee": "NO order type guarantees a maximum loss or an exact fill price.",
+        }
+
+    def verify_access(
+        self,
+        expected_portfolio_id: str | None = None,
+        products: tuple = ("BTC-USDC", "ETH-USDC", "SOL-USDC"),
+    ) -> dict:
+        """Read-only check of everything Phase 16 section 3 lists. Sends no
+        order. Every field is read from Coinbase; a failure is reported, never
+        guessed."""
+        report: dict = {"ok": False, "checks": {}, "errors": []}
+
+        def step(name, fn):
+            try:
+                report["checks"][name] = fn()
+            except Exception as exc:  # noqa: BLE001
+                report["errors"].append(f"{name}: {type(exc).__name__}: {exc}")
+                report["checks"][name] = None
+
+        perms = self.permissions
+        report["checks"]["permissions"] = {
+            "can_view": perms.get("can_view"),
+            "can_trade": perms.get("can_trade"),
+            "can_transfer": perms.get("can_transfer"),
+            "portfolio_uuid": perms.get("portfolio_uuid"),
+        }
+        step("balance_usdc", lambda: str(self.get_available_funds("USDC")))
+        step(
+            "tradable_products",
+            lambda: {
+                p: _as_dict(
+                    self._client.get_product(p, get_tradability_status=True)
+                ).get("status")
+                for p in products
+            },
+        )
+        step("open_orders", lambda: len(self.get_open_orders()))
+        step(
+            "order_history",
+            lambda: len(
+                _as_dict(self._client.list_orders(limit=25)).get("orders") or []
+            ),
+        )
+        step(
+            "fees",
+            lambda: _as_dict(self._client.get_transaction_summary()).get("fee_tier"),
+        )
+        portfolio = perms.get("portfolio_uuid")
+        isolated = bool(portfolio) and (
+            expected_portfolio_id is None or portfolio == expected_portfolio_id
+        )
+        report["checks"]["portfolio_isolated"] = isolated
+        report["checks"]["cannot_transfer"] = not perms.get("can_transfer")
+        report["ok"] = (
+            bool(perms.get("can_view"))
+            and bool(perms.get("can_trade"))
+            and not perms.get("can_transfer")
+            and isolated
+            and not report["errors"]
+        )
+        return report
 
     @staticmethod
     def _require_approval(

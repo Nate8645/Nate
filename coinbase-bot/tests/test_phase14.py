@@ -450,15 +450,25 @@ def test_fees_are_part_of_the_realised_loss(tmp_path, monkeypatch):
     assert "BTC-USDC" not in read_positions(store)
 
 
-def test_emergency_stop_blocks_exits_too_and_says_so(tmp_path, monkeypatch):
+def test_emergency_stop_allows_risk_reducing_exit_but_blocks_buys(
+    tmp_path, monkeypatch
+):
+    # Phase 15/16: a stop must still let a held position be flattened.
     ctl, store = armed(tmp_path)
     conn = FakeConnector()
     cycle(ctl, store, conn, monkeypatch)
     ctl.trigger_emergency_stop("manuell")
+    # Buys stay blocked under the stop.
+    assert cycle(ctl, store, conn, monkeypatch)["sent"] is False
+    assert len(conn.buys) == 1
+    # The controlled exit goes through and is booked.
+    conn.sell_proceeds = D(read_positions(store)["BTC-USDC"]["cost_usdc"])
     out = close_position(
         "BTC-USDC", controller=ctl, connector=conn, store=store, reason="stop"
     )
-    assert conn.sells == [] and "Position bleibt offen" in out["result"]
+    assert out["sent"] and len(conn.sells) == 1
+    assert "trotz Not-Aus" in out["exit_gate"]
+    assert "BTC-USDC" not in read_positions(store)
 
 
 # ---- readiness report ------------------------------------------------------

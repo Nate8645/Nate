@@ -279,6 +279,58 @@ class ModeController:
     def approval_phrase(self, side: str, product_id: str, size: str) -> str:
         return f"LIVE {side.upper()} {product_id} {size}"
 
+    def risk_reasons(
+        self,
+        side: str,
+        product_id: str,
+        expected_slippage_pct: Optional[D] = None,
+        notional_usdc: Optional[D] = None,
+        open_exposure_usdc: D = D("0"),
+    ) -> list:
+        """The risk checks that apply to an ENTRY in any mode (paper or live):
+        confirmed limits, product allow-list, loss ceilings, slippage, size.
+        The emergency stop and the mode/approval gate are checked separately,
+        so a paper entry runs these same risk rules without being a live order."""
+        out = []
+        if not self.limits.confirmed or not self.limits.is_complete():
+            out.append("Risikolimits nicht bestaetigt")
+        if product_id not in self.allowed_products:
+            out.append(f"Produkt {product_id} steht nicht auf der Freigabeliste")
+        breach = self.loss_breach()
+        if breach:
+            out.append(f"Verlustgrenze erreicht: {breach}")
+        if expected_slippage_pct is not None:
+            slip = D(str(expected_slippage_pct))
+            if slip > self.limits.max_slippage_pct:
+                out.append(
+                    f"Erwartete Slippage {slip}% ueber der Grenze "
+                    f"{self.limits.max_slippage_pct}%"
+                )
+        if notional_usdc is not None:
+            notional = D(str(notional_usdc))
+            room = self.max_position_usdc(notional, open_exposure_usdc)
+            if notional > room:
+                out.append(
+                    f"Ordergroesse {notional} USDC ueber dem erlaubten "
+                    f"Rahmen {room} USDC"
+                )
+        return out
+
+    def may_reduce_risk(self, product_id: str, has_position: bool) -> tuple:
+        """A controlled, risk-REDUCING exit. Allowed even while the emergency
+        stop is active - flattening a position is the one action the stop must
+        not prevent. It is only ever a SELL of a position that is actually
+        held, and the limits must be confirmed. Returns (allowed, reason)."""
+        if not has_position:
+            return False, "Keine Position zum Reduzieren"
+        if not (self.limits.confirmed and self.limits.is_complete()):
+            return False, "Risikolimits nicht bestaetigt"
+        if self.mode is TradingMode.PAPER and not self.emergency_stop:
+            return False, "Modus PAPER - echter Exit nur live oder im Not-Aus"
+        if self.emergency_stop:
+            return True, f"Risikoreduzierender Exit trotz Not-Aus ({self.stop_reason})"
+        return True, "Risikoreduzierender Exit freigegeben"
+
     def may_execute_live(
         self,
         side: str,
@@ -292,37 +344,17 @@ class ModeController:
         """Every condition must hold. Returns (allowed, reason).
 
         The checks run in the order a failure matters: stop first, then mode,
-        then limits, then the order itself.
+        then the entry risk rules, then the order itself.
         """
         if self.emergency_stop:
             return False, f"Not-Aus aktiv: {self.stop_reason}"
         if self.mode is TradingMode.PAPER:
             return False, "Modus PAPER - keine echte Order"
-        if not self.limits.confirmed or not self.limits.is_complete():
-            return False, "Risikolimits nicht bestaetigt"
-        if product_id not in self.allowed_products:
-            return False, f"Produkt {product_id} steht nicht auf der Freigabeliste"
-
-        breach = self.loss_breach()
-        if breach:
-            return False, f"Verlustgrenze erreicht: {breach}"
-
-        if expected_slippage_pct is not None:
-            slip = D(str(expected_slippage_pct))
-            if slip > self.limits.max_slippage_pct:
-                return False, (
-                    f"Erwartete Slippage {slip}% ueber der Grenze "
-                    f"{self.limits.max_slippage_pct}%"
-                )
-
-        if notional_usdc is not None:
-            notional = D(str(notional_usdc))
-            room = self.max_position_usdc(notional, open_exposure_usdc)
-            if notional > room:
-                return False, (
-                    f"Ordergroesse {notional} USDC ueber dem erlaubten "
-                    f"Rahmen {room} USDC"
-                )
+        reasons = self.risk_reasons(
+            side, product_id, expected_slippage_pct, notional_usdc, open_exposure_usdc
+        )
+        if reasons:
+            return False, reasons[0]
 
         if self.mode is TradingMode.LIVE_AUTONOMOUS:
             if not self._autonomous_armed:

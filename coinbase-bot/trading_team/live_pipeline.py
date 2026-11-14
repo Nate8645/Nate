@@ -379,8 +379,17 @@ def _book_buy(
         "partial": state == "PARTIAL",
     }
     write_positions(store, positions)
-    _set_outcome(store, cid, {"state": state, "order_id": order_id, "side": "BUY",
-                              "value_usdc": str(spent), "fees_usdc": str(fees)})
+    _set_outcome(
+        store,
+        cid,
+        {
+            "state": state,
+            "order_id": order_id,
+            "side": "BUY",
+            "value_usdc": str(spent),
+            "fees_usdc": str(fees),
+        },
+    )
     out["steps"]["review"] = {
         "requested_usdc": str(ticket.quote_size),
         "spent_usdc": str(spent),
@@ -399,26 +408,24 @@ def close_position(
 ) -> dict:
     """Sell the recorded position and book the realised result, fees included.
 
-    Exits reduce risk, so they need no capital approval - but they still need
-    an armed autonomous mode and no emergency stop, and they are deduplicated
-    like buys. With an emergency stop active the position stays open until a
-    human decides; the stop blocks every order, exits included.
+    An exit REDUCES risk, so it is the one order the emergency stop must not
+    prevent (Phase 15/16): a stop blocks new buys but still lets a held
+    position be flattened. The gate is ``may_reduce_risk``:
+      * there must be a real position (never a naked sell),
+      * limits must be confirmed,
+      * a live mode, OR an active emergency stop (controlled liquidation).
+    Exits are deduplicated and audited like buys. In pure PAPER with no stop a
+    real exit is refused (paper exits run through the paper engine instead).
     """
     out = {"symbol": symbol, "reason": reason, "sent": False}
     pos = read_positions(store).get(symbol)
     if not pos:
         out["result"] = "Keine Position"
         return out
-    if controller.emergency_stop:
-        out["result"] = (
-            f"BLOCKIERT: Not-Aus aktiv ({controller.stop_reason}) - Position bleibt offen"
-        )
-        return out
-    if (
-        controller.mode is not TradingMode.LIVE_AUTONOMOUS
-        or not controller.autonomous_armed
-    ):
-        out["result"] = "BLOCKIERT: kein scharfgeschalteter autonomer Modus"
+    allowed, why = controller.may_reduce_risk(symbol, has_position=True)
+    out["exit_gate"] = why
+    if not allowed:
+        out["result"] = f"BLOCKIERT: {why}"
         return out
     base = pos["base_size"]
     cid = new_client_order_id("hg-x")
@@ -452,10 +459,18 @@ def close_position(
     positions = read_positions(store)
     positions.pop(symbol, None)
     write_positions(store, positions)
-    _set_outcome(store, cid, {"state": "FILLED", "order_id": order_id, "side": "SELL",
-                              "value_usdc": str(proceeds),
-                              "fees_usdc": str(order.get("total_fees") or "0"),
-                              "realised_pnl_usdc": str(pnl)})
+    _set_outcome(
+        store,
+        cid,
+        {
+            "state": "FILLED",
+            "order_id": order_id,
+            "side": "SELL",
+            "value_usdc": str(proceeds),
+            "fees_usdc": str(order.get("total_fees") or "0"),
+            "realised_pnl_usdc": str(pnl),
+        },
+    )
     breach = controller.book_realised(pnl)
     out.update(
         {

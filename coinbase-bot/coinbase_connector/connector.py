@@ -41,12 +41,27 @@ def confirmation_phrase(side: str, product_id: str, size: str) -> str:
 
 
 class CoinbaseLiveConnector:
-    def __init__(self, client: Any = None, max_quote_per_order: str = "10"):
+    def __init__(
+        self,
+        client: Any = None,
+        max_quote_per_order: str = "10",
+        credentials: dict | None = None,
+    ):
+        """``credentials`` (``{"api_key", "api_secret"}``) are passed to the SDK
+        in memory and never stored; use ``coinbase_connector.keyfile`` to load
+        them from a file the operator keeps outside the repository. With no
+        client and no credentials, the SDK reads the key from the environment.
+        A transfer-capable key is refused in ``_check_permissions``."""
         if client is None:
             from coinbase.rest import RESTClient
 
-            # Reads COINBASE_API_KEY / COINBASE_API_SECRET from the environment.
-            client = RESTClient()
+            if credentials:
+                client = RESTClient(
+                    api_key=credentials["api_key"], api_secret=credentials["api_secret"]
+                )
+            else:
+                # Reads the key from the environment (COINBASE_API_KEY / ...).
+                client = RESTClient()
         self._client = client
         self._max_quote = Decimal(max_quote_per_order)
         self.permissions = self._check_permissions()

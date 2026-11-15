@@ -24,13 +24,22 @@ from decimal import Decimal as D
 from pathlib import Path
 from typing import Optional
 
-from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request,
-                     WebSocket, WebSocketDisconnect)
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from server.agents_map import AGENT_TO_STATION, connected_count, stations  # noqa: E402
@@ -62,7 +71,9 @@ class EventBus:
         self._subs: set = set()
         self._seen_ids: set = set()
 
-    def publish(self, kind: str, payload: dict, event_id: Optional[str] = None) -> Optional[dict]:
+    def publish(
+        self, kind: str, payload: dict, event_id: Optional[str] = None
+    ) -> Optional[dict]:
         """Returns the event, or None when it is a duplicate."""
         if event_id:
             if event_id in self._seen_ids:
@@ -106,17 +117,25 @@ def live_connector():
     environment of this process. The key never leaves the backend."""
     if _CONNECTOR["obj"] is not None:
         return _CONNECTOR["obj"]
-    if not os.environ.get("COINBASE_API_KEY"):
-        _CONNECTOR["error"] = "COINBASE_API_KEY ist in diesem Prozess nicht gesetzt"
-        return None
     try:
         from coinbase_connector.connector import CoinbaseLiveConnector
+        from coinbase_connector.keyfile import resolve_credentials
+
+        creds = resolve_credentials()  # COINBASE_KEY_FILE or env pair
+        if creds is None:
+            _CONNECTOR["error"] = (
+                "Kein Schluessel: weder COINBASE_KEY_FILE noch COINBASE_API_KEY gesetzt"
+            )
+            return None
         _CONNECTOR["obj"] = CoinbaseLiveConnector(
-            max_quote_per_order=str(NATE_PROFILE.max_position_usdc()))
+            credentials=creds, max_quote_per_order=str(NATE_PROFILE.max_position_usdc())
+        )
         _CONNECTOR["error"] = ""
     except Exception as exc:  # noqa: BLE001
         _CONNECTOR["error"] = f"{type(exc).__name__}: {exc}"
     return _CONNECTOR["obj"]
+
+
 MARKET: dict = {"prices": {}, "updated_at": None, "stale": True}
 BALANCE: dict = {"available_usdc": None, "source": "nicht gelesen", "updated_at": None}
 
@@ -128,20 +147,28 @@ BALANCE: dict = {"available_usdc": None, "source": "nicht gelesen", "updated_at"
 
 def _fetch_prices() -> dict:
     from coinbase.rest import RESTClient
+
     client = RESTClient()
     out = {}
     now = int(time.time())
     for product in SYMBOLS:
         try:
-            resp = client.get_public_candles(product_id=product, start=str(now - 7200),
-                                             end=str(now), granularity="ONE_HOUR", limit=2).to_dict()
+            resp = client.get_public_candles(
+                product_id=product,
+                start=str(now - 7200),
+                end=str(now),
+                granularity="ONE_HOUR",
+                limit=2,
+            ).to_dict()
             cs = sorted(resp.get("candles", []), key=lambda c: int(c["start"]))
             if cs:
                 last, prev = cs[-1], cs[0]
                 close, open_ = float(last["close"]), float(prev["open"])
-                out[product] = {"price": close,
-                                "change_pct": ((close / open_ - 1) * 100) if open_ else 0.0,
-                                "volume": float(last.get("volume", 0))}
+                out[product] = {
+                    "price": close,
+                    "change_pct": ((close / open_ - 1) * 100) if open_ else 0.0,
+                    "volume": float(last.get("volume", 0)),
+                }
         except Exception:
             continue
     return out
@@ -155,7 +182,9 @@ async def market_loop() -> None:
                 MARKET["prices"] = prices
                 MARKET["updated_at"] = time.time()
                 MARKET["stale"] = False
-                BUS.publish("market", {"prices": prices, "updated_at": MARKET["updated_at"]})
+                BUS.publish(
+                    "market", {"prices": prices, "updated_at": MARKET["updated_at"]}
+                )
             else:
                 MARKET["stale"] = True
                 BUS.publish("market_stale", {"reason": "keine Kursdaten abrufbar"})
@@ -168,19 +197,31 @@ async def market_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = asyncio.create_task(market_loop())
-    BUS.publish("system", {"message": "backend gestartet", "mode": CONTROLLER.mode.value})
+    BUS.publish(
+        "system", {"message": "backend gestartet", "mode": CONTROLLER.mode.value}
+    )
     if CONTROLLER.emergency_stop:
-        BUS.publish("emergency_stop", {"reason": CONTROLLER.stop_reason, "restored": True})
-    AUTH.audit("backend_start", mode=CONTROLLER.mode.value,
-               emergency_stop=CONTROLLER.emergency_stop,
-               unresolved_orders=len(unresolved_orders(SAFETY)))
+        BUS.publish(
+            "emergency_stop", {"reason": CONTROLLER.stop_reason, "restored": True}
+        )
+    AUTH.audit(
+        "backend_start",
+        mode=CONTROLLER.mode.value,
+        emergency_stop=CONTROLLER.emergency_stop,
+        unresolved_orders=len(unresolved_orders(SAFETY)),
+    )
     yield
     task.cancel()
 
 
 app = FastAPI(title="HyperGrok AI Trading Empire", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-                   allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 
 def current_session(authorization: str = Header(default="")) -> Session:
@@ -205,8 +246,9 @@ def require_admin_read(session: Session = Depends(current_session)) -> Session:
     return session
 
 
-def require_admin(session: Session = Depends(current_session),
-                  x_csrf_token: str = Header(default="")) -> Session:
+def require_admin(
+    session: Session = Depends(current_session), x_csrf_token: str = Header(default="")
+) -> Session:
     """State-changing routes: admin role AND a matching CSRF token, which a
     cross-site form cannot supply."""
     if session.role != "admin":
@@ -231,8 +273,12 @@ def login(payload: dict, request: Request) -> dict:
     session = AUTH.login(username, password, ip)
     if session is None:
         raise HTTPException(status_code=401, detail="Anmeldung fehlgeschlagen")
-    return {"token": session.token, "csrf": session.csrf,
-            "role": session.role, "username": session.username}
+    return {
+        "token": session.token,
+        "csrf": session.csrf,
+        "role": session.role,
+        "username": session.username,
+    }
 
 
 @app.post("/api/logout")
@@ -274,15 +320,23 @@ def state() -> dict:
         "mode": CONTROLLER.mode.value,
         "emergency_stop": CONTROLLER.emergency_stop,
         "status": CONTROLLER.status(),
-        "limits": {k: str(v) for k, v in {
-            "total_capital_usdc": CONTROLLER.limits.total_capital_usdc,
-            "max_daily_loss_usdc": CONTROLLER.limits.max_daily_loss_usdc,
-            "max_total_loss_usdc": CONTROLLER.limits.max_total_loss_usdc,
-            "max_slippage_pct": CONTROLLER.limits.max_slippage_pct,
-            "max_open_exposure_usdc": CONTROLLER.limits.max_open_exposure_usdc,
-        }.items()} | {"confirmed": CONTROLLER.limits.confirmed},
+        "limits": {
+            k: str(v)
+            for k, v in {
+                "total_capital_usdc": CONTROLLER.limits.total_capital_usdc,
+                "max_daily_loss_usdc": CONTROLLER.limits.max_daily_loss_usdc,
+                "max_total_loss_usdc": CONTROLLER.limits.max_total_loss_usdc,
+                "max_slippage_pct": CONTROLLER.limits.max_slippage_pct,
+                "max_open_exposure_usdc": CONTROLLER.limits.max_open_exposure_usdc,
+            }.items()
+        }
+        | {"confirmed": CONTROLLER.limits.confirmed},
         "stations": stations(),
-        "market": {"prices": MARKET["prices"], "updated_at": MARKET["updated_at"], "stale": stale},
+        "market": {
+            "prices": MARKET["prices"],
+            "updated_at": MARKET["updated_at"],
+            "stale": stale,
+        },
         "balance": BALANCE,
         "risk_profile": NATE_PROFILE.to_dict(),
         "safety": SAFETY.snapshot() | {"unresolved_orders": unresolved_orders(SAFETY)},
@@ -295,18 +349,31 @@ def scanner() -> dict:
     """Last scanner snapshot written by run_phase9.py. Never invented."""
     path = STATE / "dashboard_snapshot.json"
     if not path.exists():
-        return {"available": False, "reason": "kein Scanner-Snapshot vorhanden", "tokens": []}
+        return {
+            "available": False,
+            "reason": "kein Scanner-Snapshot vorhanden",
+            "tokens": [],
+        }
     data = json.loads(path.read_text())
-    return {"available": True, "generated_at": data.get("generated_at"),
-            "tokens": data.get("scanner", []), "risk_events": data.get("risk_events", [])}
+    return {
+        "available": True,
+        "generated_at": data.get("generated_at"),
+        "tokens": data.get("scanner", []),
+        "risk_events": data.get("risk_events", []),
+    }
 
 
 @app.post("/api/balance/refresh", dependencies=[Depends(require_admin)])
 def set_balance(value: float = Query(..., ge=0)) -> dict:
     """The real balance is read through the authorised Coinbase connector by the
     operator and handed in here; the server keeps no API key."""
-    BALANCE.update({"available_usdc": value, "updated_at": time.time(),
-                    "source": "Coinbase (autorisierter Connector)"})
+    BALANCE.update(
+        {
+            "available_usdc": value,
+            "updated_at": time.time(),
+            "source": "Coinbase (autorisierter Connector)",
+        }
+    )
     BUS.publish("balance", dict(BALANCE))
     return dict(BALANCE)
 
@@ -322,28 +389,47 @@ async def run_meeting(symbol: str = Query("BTC-USD")) -> dict:
         raise HTTPException(503, "zu wenig Kursdaten fuer ein Meeting")
     available = D(str(BALANCE["available_usdc"] or 0))
     result = await asyncio.to_thread(
-        hold_meeting, symbol, closes,
-        **{"risk": RiskManager(paper_risk_config()), "controller": CONTROLLER,
-           "available_usdc": available})
+        hold_meeting,
+        symbol,
+        closes,
+        **{
+            "risk": RiskManager(paper_risk_config()),
+            "controller": CONTROLLER,
+            "available_usdc": available,
+        },
+    )
     data = result.to_dict()
     BUS.publish("meeting_start", {"symbol": symbol, "price": str(closes[-1])})
     for s in data["statements"]:
         BUS.publish("agent", {**s, "station": AGENT_TO_STATION.get(s["agent"], "")})
         await asyncio.sleep(0.05)
-    BUS.publish("meeting_end", {"symbol": symbol, "final": data["final"],
-                                "consensus": data["consensus"], "agreed": data["agreed"],
-                                "prepared_order": data["prepared_order"],
-                                "note": data["execution_note"]})
+    BUS.publish(
+        "meeting_end",
+        {
+            "symbol": symbol,
+            "final": data["final"],
+            "consensus": data["consensus"],
+            "agreed": data["agreed"],
+            "prepared_order": data["prepared_order"],
+            "note": data["execution_note"],
+        },
+    )
     return data
 
 
 def _fetch_closes(symbol: str, n: int = 120) -> list:
     from coinbase.rest import RESTClient
+
     client = RESTClient()
     end = int(time.time())
     try:
-        resp = client.get_public_candles(product_id=symbol, start=str(end - 86400 * (n + 1)),
-                                         end=str(end), granularity="ONE_DAY", limit=n).to_dict()
+        resp = client.get_public_candles(
+            product_id=symbol,
+            start=str(end - 86400 * (n + 1)),
+            end=str(end),
+            granularity="ONE_DAY",
+            limit=n,
+        ).to_dict()
         cs = sorted(resp["candles"], key=lambda c: int(c["start"]))
         return [D(c["close"]) for c in cs]
     except Exception:
@@ -362,8 +448,9 @@ def set_mode(mode: str = Query(...)) -> dict:
 
 
 @app.post("/api/emergency_stop", dependencies=[Depends(require_admin)])
-def emergency_stop(reason: str = Query("Dashboard"),
-                   session: Session = Depends(current_session)) -> dict:
+def emergency_stop(
+    reason: str = Query("Dashboard"), session: Session = Depends(current_session)
+) -> dict:
     CONTROLLER.trigger_emergency_stop(reason, source=session.username)
     AUTH.audit("emergency_stop", username=session.username, reason=reason)
     BUS.publish("emergency_stop", {"reason": reason})
@@ -371,8 +458,9 @@ def emergency_stop(reason: str = Query("Dashboard"),
 
 
 @app.post("/api/emergency_stop/clear", dependencies=[Depends(require_admin)])
-def emergency_stop_clear(reason: str = Query(..., min_length=8),
-                         session: Session = Depends(current_session)) -> dict:
+def emergency_stop_clear(
+    reason: str = Query(..., min_length=8), session: Session = Depends(current_session)
+) -> dict:
     """Clearing is deliberate: an admin, a written reason, an audit entry. It
     returns the system to PAPER - it does not re-arm anything."""
     try:
@@ -388,13 +476,23 @@ def emergency_stop_clear(reason: str = Query(..., min_length=8),
 def readiness() -> dict:
     """LIVE_READINESS_CHECK. Reads and self-tests only; arms nothing."""
     report = run_readiness_check(
-        controller=CONTROLLER, connector=live_connector(), auth_store=AUTH,
-        audit_file=AUDIT_FILE, market_updated_at=MARKET["updated_at"],
+        controller=CONTROLLER,
+        connector=live_connector(),
+        auth_store=AUTH,
+        audit_file=AUDIT_FILE,
+        market_updated_at=MARKET["updated_at"],
         expected_portfolio_id=os.environ.get("HYPERGROK_PORTFOLIO_ID") or None,
-        known_orders=KNOWN_ORDERS)
+        known_orders=KNOWN_ORDERS,
+    )
     report["connector_note"] = _CONNECTOR["error"]
-    BUS.publish("readiness", {"verdict": report["verdict"], "passed": report["passed"],
-                              "total": report["total"]})
+    BUS.publish(
+        "readiness",
+        {
+            "verdict": report["verdict"],
+            "passed": report["passed"],
+            "total": report["total"],
+        },
+    )
     return report
 
 
@@ -406,7 +504,10 @@ def live_overview() -> dict:
     real_balance, source = BALANCE["available_usdc"], BALANCE["source"]
     if conn is not None:
         try:
-            real_balance, source = float(conn.get_available_funds("USDC")), "Coinbase (live)"
+            real_balance, source = (
+                float(conn.get_available_funds("USDC")),
+                "Coinbase (live)",
+            )
         except Exception as exc:  # noqa: BLE001
             source = f"Coinbase nicht lesbar: {type(exc).__name__}"
     ledger = SAFETY.read_ledger()
@@ -414,15 +515,28 @@ def live_overview() -> dict:
     stale = MARKET["updated_at"] is None or (time.time() - MARKET["updated_at"]) > 90
     unrealised, rows = D("0"), []
     for product, pos in positions.items():
-        price = None if stale else MARKET["prices"].get(product.replace("-USDC", "-USD"))
+        price = (
+            None if stale else MARKET["prices"].get(product.replace("-USDC", "-USD"))
+        )
         value = None if price is None else D(str(pos["base_size"])) * D(str(price))
         pnl = None if value is None else value - D(str(pos["cost_usdc"]))
         unrealised = None if (pnl is None or unrealised is None) else unrealised + pnl
-        rows.append({"product_id": product, **pos,
-                     "mark_usd": price, "unrealised_pnl_usdc": None if pnl is None else str(pnl)})
+        rows.append(
+            {
+                "product_id": product,
+                **pos,
+                "mark_usd": price,
+                "unrealised_pnl_usdc": None if pnl is None else str(pnl),
+            }
+        )
     orders = SAFETY.read_order_ids()
-    fees = sum((D(str((o.get("outcome") or {}).get("fees_usdc") or "0")) for o in orders.values()),
-               D("0"))
+    fees = sum(
+        (
+            D(str((o.get("outcome") or {}).get("fees_usdc") or "0"))
+            for o in orders.values()
+        ),
+        D("0"),
+    )
     realised = ledger.total_realised
     return {
         "mode": CONTROLLER.mode.value,
@@ -436,9 +550,11 @@ def live_overview() -> dict:
         "unrealised_pnl_usdc": None if unrealised is None else str(unrealised),
         "total_pnl_usdc": None if unrealised is None else str(realised + unrealised),
         "trading_fees_usdc": str(fees),
-        "order_history": [{"client_order_id": cid, **row} for cid, row in orders.items()][-50:],
+        "order_history": [
+            {"client_order_id": cid, **row} for cid, row in orders.items()
+        ][-50:],
         "note": "Nur Orders dieses Systems. Die zwei Testorders vom 13.11. liefen ueber den "
-                "Coinbase-Connector der Sitzung und stehen nicht in diesem Ledger.",
+        "Coinbase-Connector der Sitzung und stehen nicht in diesem Ledger.",
     }
 
 
@@ -460,15 +576,31 @@ async def ws(socket: WebSocket, token: str = Query(""), since: int = Query(0)) -
         # Resume: replay everything the client missed, in order.
         for event in BUS.since(since):
             await socket.send_text(json.dumps(event))
-        await socket.send_text(json.dumps({"seq": BUS.seq, "kind": "sync",
-                                           "ts": time.time(), "payload": {"resumed_from": since}}))
+        await socket.send_text(
+            json.dumps(
+                {
+                    "seq": BUS.seq,
+                    "kind": "sync",
+                    "ts": time.time(),
+                    "payload": {"resumed_from": since},
+                }
+            )
+        )
         while True:
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=15)
                 await socket.send_text(json.dumps(event))
             except asyncio.TimeoutError:
-                await socket.send_text(json.dumps({"seq": BUS.seq, "kind": "heartbeat",
-                                                   "ts": time.time(), "payload": {}}))
+                await socket.send_text(
+                    json.dumps(
+                        {
+                            "seq": BUS.seq,
+                            "kind": "heartbeat",
+                            "ts": time.time(),
+                            "payload": {},
+                        }
+                    )
+                )
     except WebSocketDisconnect:
         pass
     except Exception:
@@ -499,6 +631,7 @@ def spa_fallback(request, exc):
 
 if __name__ == "__main__":
     import uvicorn
+
     print("=" * 64)
     password = AUTH.bootstrap_admin()
     if password:

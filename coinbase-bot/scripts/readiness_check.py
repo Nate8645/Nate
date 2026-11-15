@@ -21,31 +21,51 @@ sys.path.insert(0, str(ROOT))
 from server.auth import AUDIT_FILE, AuthStore  # noqa: E402
 from trading_team.modes import ModeController  # noqa: E402
 from trading_team.persistence import SafetyStore  # noqa: E402
-from trading_team.readiness import KNOWN_ORDERS, READY, run_readiness_check  # noqa: E402
+from trading_team.readiness import (
+    KNOWN_ORDERS,
+    READY,
+    run_readiness_check,
+)  # noqa: E402
 from trading_team.risk_config import NATE_CONFIRMED_LIMITS  # noqa: E402
 
 
 def main() -> int:
-    connector, note = None, "COINBASE_API_KEY nicht gesetzt"
-    if os.environ.get("COINBASE_API_KEY"):
-        try:
-            from coinbase_connector.connector import CoinbaseLiveConnector
-            connector, note = CoinbaseLiveConnector(max_quote_per_order="17.10"), "verbunden"
-        except Exception as exc:  # noqa: BLE001
-            note = f"{type(exc).__name__}: {exc}"
+    connector, note = (
+        None,
+        "Kein Schluessel (COINBASE_KEY_FILE/COINBASE_API_KEY) gesetzt",
+    )
+    try:
+        from coinbase_connector.connector import CoinbaseLiveConnector
+        from coinbase_connector.keyfile import resolve_credentials
+
+        creds = resolve_credentials()
+        if creds is not None:
+            connector = CoinbaseLiveConnector(
+                credentials=creds, max_quote_per_order="17.10"
+            )
+            note = "verbunden"
+    except Exception as exc:  # noqa: BLE001
+        note = f"{type(exc).__name__}: {exc}"
     market_ts = None
     try:
         from server.app import _fetch_prices
+
         if _fetch_prices():
             market_ts = time.time()
     except Exception:  # noqa: BLE001
         market_ts = None
-    controller = ModeController(NATE_CONFIRMED_LIMITS, store=SafetyStore(ROOT / "state"))
+    controller = ModeController(
+        NATE_CONFIRMED_LIMITS, store=SafetyStore(ROOT / "state")
+    )
     report = run_readiness_check(
-        controller=controller, connector=connector, auth_store=AuthStore.load(),
-        audit_file=AUDIT_FILE, market_updated_at=market_ts,
+        controller=controller,
+        connector=connector,
+        auth_store=AuthStore.load(),
+        audit_file=AUDIT_FILE,
+        market_updated_at=market_ts,
         expected_portfolio_id=os.environ.get("HYPERGROK_PORTFOLIO_ID") or None,
-        known_orders=KNOWN_ORDERS)
+        known_orders=KNOWN_ORDERS,
+    )
     print(f"Connector: {note}")
     for c in report["criteria"]:
         print(f"{c['number']:>2}. {'PASS' if c['passed'] else 'FAIL'}  {c['title']}")

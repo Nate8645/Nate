@@ -35,7 +35,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import sys
@@ -44,6 +44,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from server.agents_map import AGENT_TO_STATION, connected_count, stations  # noqa: E402
 from server.auth import AUDIT_FILE, AuthStore, Session  # noqa: E402
+from server.secretstore import SecretError, SecretStore  # noqa: E402
+from coinbase_connector.keyfile import load_key_from_text  # noqa: E402
 from multimarket import smart_money, social, whale  # noqa: E402
 from trading_team import RiskManager, paper_risk_config  # noqa: E402
 from trading_team.meeting import hold_meeting  # noqa: E402
@@ -109,7 +111,27 @@ BUS = EventBus()
 # NOT armed here and there is no HTTP route that arms it.
 SAFETY = SafetyStore(STATE)
 CONTROLLER = ModeController(NATE_CONFIRMED_LIMITS, store=SAFETY)
+# Encrypted-at-rest Coinbase key. Configured from the mobile setup page; the
+# plaintext key lives only in memory after an unlock, never in GitHub or logs.
+SECRETS = SecretStore(STATE / "secret.enc")
 _CONNECTOR: dict = {"obj": None, "error": "nicht versucht"}
+
+
+def reset_connector() -> None:
+    """Drop the cached connector so the next call rebuilds it (after the key
+    changes, unlocks, or is cleared)."""
+    _CONNECTOR["obj"] = None
+    _CONNECTOR["error"] = "nicht versucht"
+
+
+def _current_credentials():
+    """Credentials for the SDK, preferring the unlocked encrypted store, then
+    a local key file / env pair. Returns None when nothing is available."""
+    if SECRETS.is_unlocked:
+        return load_key_from_text(SECRETS.plaintext())
+    from coinbase_connector.keyfile import resolve_credentials
+
+    return resolve_credentials()
 
 
 def live_connector():
@@ -119,12 +141,11 @@ def live_connector():
         return _CONNECTOR["obj"]
     try:
         from coinbase_connector.connector import CoinbaseLiveConnector
-        from coinbase_connector.keyfile import resolve_credentials
 
-        creds = resolve_credentials()  # COINBASE_KEY_FILE or env pair
+        creds = _current_credentials()  # encrypted store, key file, or env
         if creds is None:
             _CONNECTOR["error"] = (
-                "Kein Schluessel: weder COINBASE_KEY_FILE noch COINBASE_API_KEY gesetzt"
+                "Kein Schluessel: ueber /setup einrichten oder COINBASE_KEY_FILE setzen"
             )
             return None
         _CONNECTOR["obj"] = CoinbaseLiveConnector(
@@ -194,9 +215,95 @@ async def market_loop() -> None:
         await asyncio.sleep(30)
 
 
+# Scheduler / position monitor. Prepared and persistent, but SAFE: it never
+# sends a real entry. When enabled it runs the forward-paper cycle and watches
+# open positions for stop-loss / take-profit / time exits. Real exits only run
+# when a connector is configured and only to REDUCE risk (never a new buy).
+SCHED: dict = {
+    "enabled": False,
+    "interval": 60,
+    "last_tick": None,
+    "last_result": None,
+    "ticks": 0,
+}
+
+
+def _autotrade_tick() -> dict:
+    """One scheduler tick (runs in a thread). Returns a small summary."""
+    from decimal import Decimal as D
+    from trading_team import RiskManager
+    from trading_team.engine import monitor_positions, run_once
+    from trading_team.risk_config import live_risk_config
+    from scripts.forward_paper import PublicConnector, STORE, fetch_ohlcv, spot_prices
+
+    conn = live_connector() or PublicConnector()
+    risk = RiskManager(live_risk_config())
+    entries = []
+    for symbol in SYMBOLS:
+        pid = symbol if symbol.endswith("-USDC") else symbol.replace("-USD", "-USDC")
+        try:
+            ohlcv = fetch_ohlcv(pid)
+        except Exception as exc:  # noqa: BLE001
+            entries.append(
+                {"symbol": pid, "result": f"DATA STALE: {type(exc).__name__}"}
+            )
+            continue
+        out = run_once(
+            pid,
+            ohlcv,
+            controller=CONTROLLER,
+            risk=risk,
+            connector=conn,
+            store=STORE,
+            market_updated_at=time.time(),
+            fee_rate=D("0.001"),
+            min_order_usdc=D("1"),
+            mode=TradingMode.PAPER,
+        )
+        entries.append({"symbol": pid, "result": out["result"]})
+    prices = spot_prices()
+    paper_mon = monitor_positions(
+        prices, controller=CONTROLLER, connector=conn, store=STORE, paper=True
+    )
+    # Real positions: only watch for risk-reducing exits, never a new entry.
+    real_mon = {"checked": 0, "actions": [], "watch_blocked": []}
+    if live_connector() is not None:
+        real_mon = monitor_positions(
+            MARKET["prices"],
+            controller=CONTROLLER,
+            connector=live_connector(),
+            store=SAFETY,
+            paper=False,
+            market_stale=MARKET["stale"],
+        )
+    return {"entries": entries, "paper_monitor": paper_mon, "real_monitor": real_mon}
+
+
+async def autotrade_loop() -> None:
+    while True:
+        try:
+            if SCHED["enabled"]:
+                SCHED["last_result"] = await asyncio.to_thread(_autotrade_tick)
+                SCHED["ticks"] += 1
+                SCHED["last_tick"] = time.time()
+                BUS.publish(
+                    "scheduler",
+                    {"ticks": SCHED["ticks"], "summary": SCHED["last_result"]},
+                )
+        except Exception as exc:  # noqa: BLE001
+            BUS.publish("error", {"where": "autotrade_loop", "detail": str(exc)[:200]})
+        await asyncio.sleep(max(15, int(SCHED["interval"])))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = asyncio.create_task(market_loop())
+    # Persistent host: unlock the stored key automatically if the passphrase is
+    # provided via the host's own env-var vault. No passphrase -> stays locked.
+    if SECRETS.try_env_unlock():
+        reset_connector()
+        BUS.publish("key", {"event": "auto_unlock", "status": SECRETS.status()})
+    sched = asyncio.create_task(autotrade_loop())
     BUS.publish(
         "system", {"message": "backend gestartet", "mode": CONTROLLER.mode.value}
     )
@@ -212,6 +319,7 @@ async def lifespan(app: FastAPI):
     )
     yield
     task.cancel()
+    sched.cancel()
 
 
 app = FastAPI(title="HyperGrok AI Trading Empire", lifespan=lifespan)
@@ -556,6 +664,226 @@ def live_overview() -> dict:
         "note": "Nur Orders dieses Systems. Die zwei Testorders vom 13.11. liefen ueber den "
         "Coinbase-Connector der Sitzung und stehen nicht in diesem Ledger.",
     }
+
+
+# --------------------------------------------------------------------------
+# Coinbase key setup from the phone (authenticated, HTTPS, encrypted at rest)
+# --------------------------------------------------------------------------
+
+
+_SETUP_HTML = """<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HyperGrok · Schluessel einrichten</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;background:#07090f;color:#e7ecf3;font:16px/1.5 -apple-system,system-ui,sans-serif;padding:16px}
+  h1{font-size:18px;letter-spacing:.1em;text-transform:uppercase;color:#7cf5c0}
+  .card{max-width:520px;margin:0 auto;background:#0d1320;border:1px solid #1d2838;border-radius:16px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:12px;color:#9fb0c3;margin:10px 0 4px}
+  input,textarea,button{width:100%;font-size:16px;border-radius:12px;border:1px solid #273448;background:#0a0f1a;color:#e7ecf3;padding:12px;min-height:48px}
+  textarea{min-height:120px;font-family:ui-monospace,monospace}
+  button{background:#12b981;color:#04120c;border:none;font-weight:700;margin-top:14px}
+  button.secondary{background:#1b2740;color:#cfe}
+  .muted{color:#7f90a5;font-size:13px}
+  .ok{color:#56e39f}.bad{color:#ff6b6b}.warn{color:#ffcf6b}
+  pre{white-space:pre-wrap;word-break:break-word;background:#070b13;border:1px solid #1d2838;border-radius:12px;padding:10px;font-size:12px}
+  .hide{display:none}
+</style></head>
+<body><div class="card">
+  <h1>HyperGrok · Schluessel</h1>
+  <p class="muted">Nur ueber HTTPS. Der Schluessel wird einmal gesendet, auf dem
+  Server verschluesselt gespeichert und nie im Browser abgelegt.</p>
+</div>
+
+<div class="card" id="loginCard">
+  <label>Benutzer</label><input id="u" autocomplete="username">
+  <label>Passwort</label><input id="p" type="password" autocomplete="current-password">
+  <button onclick="login()">Anmelden</button>
+  <p id="loginMsg" class="muted"></p>
+</div>
+
+<div class="card hide" id="keyCard">
+  <p class="muted">Status: <span id="status">...</span></p>
+  <label>CDP-Schluesseldatei (Inhalt einfuegen: JSON, PEM oder Text)</label>
+  <textarea id="key" placeholder='{ "name": "organizations/.../apiKeys/...", ... }'></textarea>
+  <label>Verschluesselungs-Passphrase (min. 8 Zeichen, merken!)</label>
+  <input id="pass" type="password" autocomplete="new-password">
+  <button onclick="setup()">Pruefen &amp; verschluesselt speichern</button>
+  <button class="secondary" onclick="unlock()">Nur entsperren (Passphrase)</button>
+  <p id="keyMsg" class="muted"></p>
+  <pre id="report" class="hide"></pre>
+</div>
+
+<script>
+let TOKEN="", CSRF="";
+const $=id=>document.getElementById(id);
+async function api(path, opts={}){
+  opts.headers=Object.assign({"content-type":"application/json"}, opts.headers||{});
+  if(TOKEN) opts.headers["Authorization"]="Bearer "+TOKEN;
+  if(opts.method&&opts.method!=="GET") opts.headers["X-CSRF-Token"]=CSRF;
+  const r=await fetch(path, opts);
+  const t=await r.text(); let j={}; try{j=JSON.parse(t)}catch(e){}
+  if(!r.ok) throw new Error(j.detail||r.status); return j;
+}
+async function login(){
+  $("loginMsg").textContent="...";
+  try{
+    const j=await api("/api/login",{method:"POST",body:JSON.stringify({username:$("u").value,password:$("p").value})});
+    TOKEN=j.token; CSRF=j.csrf;
+    if(j.role!=="admin"){$("loginMsg").innerHTML='<span class="bad">Admin-Konto noetig.</span>';return;}
+    $("loginCard").classList.add("hide"); $("keyCard").classList.remove("hide"); refresh();
+  }catch(e){$("loginMsg").innerHTML='<span class="bad">'+e.message+'</span>';}
+}
+async function refresh(){
+  try{const s=await api("/api/key/status");
+    const sec=s.secret||{};
+    $("status").innerHTML=(sec.configured?('<span class="ok">gespeichert</span>'+(sec.unlocked?' · entsperrt':' · <span class="warn">gesperrt</span>')+(sec.key_id_suffix?(' · ...'+sec.key_id_suffix):'')):'<span class="warn">nicht eingerichtet</span>')
+      +(s.connected?' · <span class="ok">verbunden</span>':'');
+  }catch(e){$("status").textContent=e.message;}
+}
+async function setup(){
+  $("keyMsg").textContent="pruefe read-only ..."; $("report").classList.add("hide");
+  try{
+    const j=await api("/api/key/setup",{method:"POST",body:JSON.stringify({key:$("key").value,passphrase:$("pass").value})});
+    $("key").value=""; // never keep the key in the field
+    $("keyMsg").innerHTML='<span class="ok">Gespeichert &amp; verschluesselt.</span>';
+    $("report").textContent=JSON.stringify(j.verify,null,2); $("report").classList.remove("hide");
+    refresh();
+  }catch(e){$("keyMsg").innerHTML='<span class="bad">'+e.message+'</span>';}
+}
+async function unlock(){
+  $("keyMsg").textContent="...";
+  try{await api("/api/key/unlock",{method:"POST",body:JSON.stringify({passphrase:$("pass").value})});
+    $("keyMsg").innerHTML='<span class="ok">Entsperrt.</span>'; refresh();
+  }catch(e){$("keyMsg").innerHTML='<span class="bad">'+e.message+'</span>';}
+}
+</script>
+</body></html>"""
+
+
+def _verify_key_readonly(creds: dict) -> dict:
+    """Build the connector read-only and run verify_access. Returns a sanitized
+    report. Raises ConnectorError for a transfer-capable key (never accepted)."""
+    from coinbase_connector.connector import CoinbaseLiveConnector
+
+    expected = os.environ.get("HYPERGROK_PORTFOLIO_ID") or None
+    conn = CoinbaseLiveConnector(
+        credentials=creds, max_quote_per_order=str(NATE_PROFILE.max_position_usdc())
+    )
+    report = conn.verify_access(expected_portfolio_id=expected)
+    try:
+        report["usdc_available"] = str(conn.get_available_funds("USDC"))
+        report["btc_available"] = str(conn.get_available_funds("BTC"))
+    except Exception as exc:  # noqa: BLE001
+        report["balance_error"] = f"{type(exc).__name__}: {exc}"
+    return report
+
+
+@app.get("/api/key/status", dependencies=[Depends(require_admin_read)])
+def key_status() -> dict:
+    conn = live_connector()
+    return {
+        "secret": SECRETS.status(),
+        "connector_error": _CONNECTOR["error"],
+        "connected": conn is not None,
+        "permissions": (conn.permissions if conn else None)
+        and {
+            k: conn.permissions.get(k)
+            for k in ("can_view", "can_trade", "can_transfer", "portfolio_type")
+        },
+    }
+
+
+@app.post("/api/key/setup", dependencies=[Depends(require_admin)])
+def key_setup(payload: dict, session: Session = Depends(current_session)) -> dict:
+    """Receive the CDP key content + an encryption passphrase from the phone.
+    Verifies read-only (view+trade, NO transfer, portfolio, balance), then
+    encrypts it at rest. The key is never logged or echoed back."""
+    content = str(payload.get("key") or "").strip()
+    passphrase = str(payload.get("passphrase") or "")
+    if not content:
+        raise HTTPException(400, "Kein Schluesselinhalt.")
+    try:
+        creds = load_key_from_text(content)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Schluessel nicht lesbar: {type(exc).__name__}")
+    try:
+        report = _verify_key_readonly(creds)
+    except Exception as exc:  # noqa: BLE001 - e.g. transfer permission refused
+        AUTH.audit(
+            "key_setup_rejected", username=session.username, reason=type(exc).__name__
+        )
+        raise HTTPException(400, f"Schluessel abgelehnt: {exc}")
+    try:
+        SECRETS.store(content, passphrase, key_id_suffix=creds["api_key"][-6:])
+    except SecretError as exc:
+        raise HTTPException(400, str(exc))
+    reset_connector()
+    AUTH.audit(
+        "key_setup_ok", username=session.username, key_id_suffix=creds["api_key"][-6:]
+    )
+    BUS.publish("key", {"event": "configured", "status": SECRETS.status()})
+    return {"stored": True, "secret": SECRETS.status(), "verify": report}
+
+
+@app.post("/api/key/unlock", dependencies=[Depends(require_admin)])
+def key_unlock(payload: dict, session: Session = Depends(current_session)) -> dict:
+    try:
+        SECRETS.unlock(str(payload.get("passphrase") or ""))
+    except SecretError as exc:
+        raise HTTPException(400, str(exc))
+    reset_connector()
+    AUTH.audit("key_unlock", username=session.username)
+    return {"unlocked": True, "secret": SECRETS.status()}
+
+
+@app.post("/api/key/lock", dependencies=[Depends(require_admin)])
+def key_lock(session: Session = Depends(current_session)) -> dict:
+    SECRETS.lock()
+    reset_connector()
+    AUTH.audit("key_lock", username=session.username)
+    return {"locked": True, "secret": SECRETS.status()}
+
+
+@app.post("/api/key/clear", dependencies=[Depends(require_admin)])
+def key_clear(session: Session = Depends(current_session)) -> dict:
+    SECRETS.clear()
+    reset_connector()
+    AUTH.audit("key_clear", username=session.username)
+    BUS.publish("key", {"event": "cleared"})
+    return {"cleared": True, "secret": SECRETS.status()}
+
+
+@app.get("/api/scheduler", dependencies=[Depends(require_admin_read)])
+def scheduler_status() -> dict:
+    return {k: SCHED[k] for k in ("enabled", "interval", "ticks", "last_tick")} | {
+        "last_result": SCHED["last_result"]
+    }
+
+
+@app.post("/api/scheduler", dependencies=[Depends(require_admin)])
+def scheduler_toggle(
+    enabled: bool = Query(...),
+    interval: int = Query(60),
+    session: Session = Depends(current_session),
+) -> dict:
+    SCHED["enabled"] = bool(enabled)
+    SCHED["interval"] = max(15, int(interval))
+    AUTH.audit("scheduler", username=session.username, enabled=SCHED["enabled"])
+    BUS.publish(
+        "scheduler", {"enabled": SCHED["enabled"], "interval": SCHED["interval"]}
+    )
+    return {"enabled": SCHED["enabled"], "interval": SCHED["interval"]}
+
+
+@app.get("/setup")
+def setup_page() -> "HTMLResponse":
+    """A self-contained mobile page (no build step) to configure the Coinbase
+    key from Safari on the iPhone. It talks only to the authenticated API over
+    HTTPS; the key is sent once and never stored in the browser."""
+    return HTMLResponse(_SETUP_HTML)
 
 
 # --------------------------------------------------------------------------

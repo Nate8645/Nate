@@ -54,6 +54,16 @@ def load_key_file(path: str | Path) -> dict:
     raw = p.read_text(encoding="utf-8", errors="strict").strip()
     if not raw:
         raise KeyFileError("Schluesseldatei ist leer.")
+    return load_key_from_text(raw)
+
+
+def load_key_from_text(raw: str) -> dict:
+    """Same formats as ``load_key_file`` but from an in-memory string - used
+    when the key arrives from the mobile setup form instead of a file path.
+    Never logs ``raw``; a parse error does not quote it."""
+    raw = (raw or "").strip()
+    if not raw:
+        raise KeyFileError("Kein Schluesselinhalt uebergeben.")
 
     # 1) CDP JSON
     try:

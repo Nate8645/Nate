@@ -1,0 +1,4 @@
+
+# Claude Code session artifacts (local only)
+.claude/command-history.log
+.claude/agent-metrics.jsonl

@@ -9,6 +9,11 @@ nothing that claims the model is "really Fable 5".
 - This plugin: a lean skill (progressive disclosure) + /max-* commands + checkpoint template.
 
 ## Install (portable, iPhone/Cloud)
+
+One-step install (Claude Code 2.1.275+):
+```
+/plugin install max-fable-infinity --marketplace Nate8645/Nate
+```
 Already registered in this repo's `.claude-plugin/marketplace.json` as
 `max-fable-infinity`. Enable via `/plugin` (marketplace `nate-marketplace`) or it is
 pre-enabled in `.claude/settings.json`. To reuse in another project, copy `CLAUDE.md`

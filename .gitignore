@@ -1,3 +1,4 @@
+# Claude Code session artifacts (local only)
 .claude/agent-metrics.jsonl
 .claude/command-history.log
 
@@ -14,3 +15,6 @@ __pycache__/
 coinbase-bot/state/
 coinbase-bot/web/node_modules/
 coinbase-bot/web/dist/
+
+# MAX FABLE token-guard per-session state (local only)
+.claude/.max-fable-state-*.json

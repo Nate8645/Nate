@@ -10,5 +10,29 @@
   "enabledPlugins": {
     "ultra-enterprise-os@nate-marketplace": true,
     "max-fable-infinity@nate-marketplace": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/max-fable-infinity/hooks/token_guard.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/max-fable-infinity/hooks/token_guard.py\""
+          }
+        ]
+      }
+    ]
   }
 }

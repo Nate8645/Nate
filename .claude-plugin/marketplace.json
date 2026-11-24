@@ -5,8 +5,8 @@
     "email": "beamswiss@gmail.com"
   },
   "metadata": {
-    "description": "Nates privater Plugin-Marketplace. Enthaelt ULTRA AI ENTERPRISE OS.",
-    "version": "1.0.0"
+    "description": "Nates privater Plugin-Marketplace. Enthaelt ULTRA AI ENTERPRISE OS und MAX FABLE INFINITY 2027.",
+    "version": "1.1.0"
   },
   "plugins": [
     {
@@ -14,17 +14,17 @@
       "source": "./ultra-enterprise-os",
       "description": "Autonomes AI Enterprise Operating System: dynamischer Orchestrator, der fuer jede Aufgabe die optimale virtuelle Organisation aus spezialisierten Teams, Agenten und Sub-Agenten zusammenstellt und nur das konsolidierte Endergebnis liefert.",
       "version": "1.0.0",
-      "author": {
-        "name": "Nate"
-      },
-      "keywords": [
-        "orchestrator",
-        "multi-agent",
-        "enterprise",
-        "teams",
-        "automation",
-        "quality"
-      ],
+      "author": { "name": "Nate" },
+      "keywords": ["orchestrator","multi-agent","enterprise","teams","automation","quality"],
+      "category": "productivity"
+    },
+    {
+      "name": "max-fable-infinity",
+      "source": "./max-fable-infinity",
+      "description": "CHF-0 token-efficiency und autonomes Entwicklungs-OS: adaptive Modi (ECO/SMART/FABLE-ULTRA/RECOVERY/AUTO), Token-Disziplin, Session-Recovery und persistentes Projektgedaechtnis. Nur Arbeitsmethoden - keine kostenpflichtigen APIs, keine neuen Keys, keine Limit-Umgehung.",
+      "version": "1.0.0",
+      "author": { "name": "Nate" },
+      "keywords": ["token-optimization","autonomy","session-recovery","memory","efficiency","fable"],
       "category": "productivity"
     }
   ]
